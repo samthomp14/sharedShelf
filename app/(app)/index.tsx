@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
+
+type ViewMode = 'covers' | 'list';
 
 interface ShelfItemRow {
   id: string;
@@ -24,6 +26,7 @@ export default function MyShelf() {
   const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -106,13 +109,39 @@ export default function MyShelf() {
   return (
     <View style={styles.container}>
       <FlatList
+        key={viewMode}
         data={filteredItems}
         keyExtractor={(item) => item.id}
+        numColumns={viewMode === 'covers' ? 3 : 1}
+        columnWrapperStyle={viewMode === 'covers' ? styles.gridRow : undefined}
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={load}
         ListHeaderComponent={
           <View>
+            {items.length > 0 && (
+              <View style={styles.viewToggle}>
+                <Pressable
+                  style={[styles.toggleButton, viewMode === 'covers' && styles.toggleButtonActive]}
+                  onPress={() => setViewMode('covers')}
+                >
+                  <Text
+                    style={[styles.toggleText, viewMode === 'covers' && styles.toggleTextActive]}
+                  >
+                    Covers
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
+                  onPress={() => setViewMode('list')}
+                >
+                  <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
+                    List
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
             {items.length > 0 && (
               <TextInput
                 style={[inputStyle, styles.searchInput]}
@@ -172,19 +201,39 @@ export default function MyShelf() {
             </View>
           ) : null
         }
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
-              <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
+        renderItem={({ item }) =>
+          viewMode === 'covers' ? (
+            <View style={styles.coverCard}>
+              {item.book?.cover_url ? (
+                <Image source={{ uri: item.book.cover_url }} style={styles.coverImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.spinePlaceholder}>
+                  <Text style={styles.spineTitle} numberOfLines={5}>
+                    {item.book?.title ?? 'Unknown title'}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.coverCardTitle} numberOfLines={2}>
+                {item.book?.title ?? 'Unknown title'}
+              </Text>
+              {item.status !== 'available' && (
+                <Chip label={item.status.replace('_', ' ')} />
+              )}
             </View>
-            {item.status === 'on_loan' ? (
-              <Button title="Mark returned" variant="secondary" onPress={() => markReturned(item.id)} />
-            ) : (
-              <Chip label={item.status.replace('_', ' ')} />
-            )}
-          </View>
-        )}
+          ) : (
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
+                <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
+              </View>
+              {item.status === 'on_loan' ? (
+                <Button title="Mark returned" variant="secondary" onPress={() => markReturned(item.id)} />
+              ) : (
+                <Chip label={item.status.replace('_', ' ')} />
+              )}
+            </View>
+          )
+        }
       />
     </View>
   );
@@ -193,8 +242,65 @@ export default function MyShelf() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
+  viewToggle: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
+  },
+  toggleText: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  toggleTextActive: {
+    color: colors.background,
+  },
   searchInput: {
     marginBottom: 16,
+  },
+  gridRow: {
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  coverCard: {
+    width: '31%',
+    marginBottom: 20,
+  },
+  coverImage: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    backgroundColor: colors.chipBackground,
+    marginBottom: 6,
+  },
+  spinePlaceholder: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    backgroundColor: colors.chipBackground,
+    marginBottom: 6,
+    padding: 8,
+    justifyContent: 'center',
+  },
+  spineTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  coverCardTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    color: colors.text,
+    marginBottom: 4,
   },
   sectionTitle: {
     fontFamily: fonts.semibold,
