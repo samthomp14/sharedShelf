@@ -1,0 +1,47 @@
+app/(app)/friends.tsx
+  s_88b27d5fe63d8f::t_06a0d9fff85227 5,92,95-97,99-100,102-109
+app.json
+  s_88b27d5fe63d8f::t_9ec50f01773fb9 26-28
+app/(app)/friend/[id].tsx
+  s_88b27d5fe63d8f::t_5b356fe973b090 3,5-7,80,82,92,97-101,103-104,106-112
+app/(auth)/sign-in.tsx
+  s_88b27d5fe63d8f::t_3a47ceea32a9ad 2,4-5,69,79,89,103-108,124,127,129,133,135,141,143-144,149-150,153-154,159-160,164,168,171-172
+app/_layout.tsx
+  s_88b27d5fe63d8f::t_202111edd70250 1,4-11,15-17,25,43-59,64,75
+app/(app)/_layout.tsx
+  s_88b27d5fe63d8f::t_197fa4b2ca928e 2,6-15,17-18
+  s_88b27d5fe63d8f::t_6f9b6a704984ff 16
+package.json
+  s_88b27d5fe63d8f::t_9ec50f01773fb9 6,11,14
+lib/theme.ts
+  s_88b27d5fe63d8f::t_7cf97adf86371d 1-41
+components/Button.tsx
+  s_88b27d5fe63d8f::t_762572f1b6cf5e 1-60
+components/Chip.tsx
+  s_88b27d5fe63d8f::t_d69459b8dbca89 1-25
+app/(app)/index.tsx
+  s_88b27d5fe63d8f::t_2a80d16163d8f0 3,5-7,63-67,71-73,79,82-88,90-91,93-105
+package-lock.json
+  s_88b27d5fe63d8f::t_597402d9cc4de2 11,16,19,1175-1180,3773-3786
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f4e3034dcd4250efc0b5b49bd794f988372b6b91",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_88b27d5fe63d8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1349e911-da0e-4635-9ca1-234e1d449c3e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
