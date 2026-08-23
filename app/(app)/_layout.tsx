@@ -1,14 +1,7 @@
 import { Tabs } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../../lib/theme';
 
 export default function AppLayout() {
-  const insets = useSafeAreaInsets();
-  // Reserve space for the home indicator (or its web/emulator equivalent) —
-  // react-navigation's automatic inset handling doesn't reliably kick in on
-  // web, so fall back to a fixed minimum padding when insets.bottom is 0.
-  const bottomPadding = Math.max(insets.bottom, 8);
-
   return (
     <Tabs
       screenOptions={{
@@ -16,13 +9,11 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 17 },
-        tabBarStyle: {
-          backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          height: 50 + bottomPadding,
-          paddingBottom: bottomPadding,
-          paddingTop: 8,
-        },
+        // Deliberately no explicit height/padding here — react-navigation
+        // already computes a safe-area-aware tab bar height internally.
+        // Setting our own competes with that and can push the bar (and its
+        // labels) off-screen entirely depending on platform/inset timing.
+        tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textFaint,
@@ -34,6 +25,7 @@ export default function AppLayout() {
       <Tabs.Screen name="friend/[id]" options={{ href: null, title: 'Shelf' }} />
       <Tabs.Screen name="add-book" options={{ href: null, title: 'Add a Book' }} />
       <Tabs.Screen name="add-friend" options={{ href: null, title: 'Add a Friend' }} />
+      <Tabs.Screen name="profile" options={{ href: null, title: 'Profile' }} />
     </Tabs>
   );
 }

@@ -171,7 +171,13 @@ export default function MyShelf() {
         )}
       />
       <View style={styles.footer}>
-        <Button title="Sign out" variant="secondary" onPress={signOut} />
+        <Button
+          title="Profile"
+          variant="secondary"
+          onPress={() => router.push('/profile')}
+          style={styles.footerButton}
+        />
+        <Button title="Sign out" variant="secondary" onPress={signOut} style={styles.footerButton} />
       </View>
     </View>
   );
@@ -224,8 +230,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   footer: {
+    flexDirection: 'row',
+    gap: 8,
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  footerButton: {
+    flex: 1,
   },
 });
