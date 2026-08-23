@@ -1,8 +1,20 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  FunnelSans_400Regular,
+  FunnelSans_500Medium,
+  FunnelSans_600SemiBold,
+  FunnelSans_700Bold,
+} from '@expo-google-fonts/funnel-sans';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { colors } from '../lib/theme';
+
+SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { session, initializing } = useAuth();
@@ -10,7 +22,7 @@ function RootNavigator() {
   if (initializing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.text} />
       </View>
     );
   }
@@ -28,11 +40,28 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    FunnelSans_400Regular,
+    FunnelSans_500Medium,
+    FunnelSans_600SemiBold,
+    FunnelSans_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <RootNavigator />
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
       </AuthProvider>
     </SafeAreaProvider>
   );
@@ -43,5 +72,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
 });

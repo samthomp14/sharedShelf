@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { Chip } from '../../components/Chip';
+import { Button } from '../../components/Button';
+import { colors, fonts } from '../../lib/theme';
 
 interface ShelfItemRow {
   id: string;
@@ -57,33 +60,47 @@ export default function MyShelf() {
         }
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
-            <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
-            <Text style={styles.status}>{item.status}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
+              <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
+            </View>
+            <Chip label={item.status.replace('_', ' ')} />
           </View>
         )}
       />
-      <Pressable style={styles.signOut} onPress={signOut}>
-        <Text style={styles.signOutText}>Sign out</Text>
-      </Pressable>
+      <View style={styles.footer}>
+        <Button title="Sign out" variant="secondary" onPress={signOut} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
   row: {
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  bookTitle: { fontSize: 16, fontWeight: '600' },
-  bookAuthor: { fontSize: 14, color: '#666', marginTop: 2 },
-  status: { fontSize: 12, color: '#999', marginTop: 4, textTransform: 'uppercase' },
+  bookTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  bookAuthor: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
-  emptyBody: { fontSize: 14, color: '#666', textAlign: 'center', paddingHorizontal: 32 },
-  signOut: { padding: 16, alignItems: 'center' },
-  signOutText: { color: '#c00', fontSize: 14 },
+  emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
+  emptyBody: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
 });

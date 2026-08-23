@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { Chip } from '../../../components/Chip';
+import { Button } from '../../../components/Button';
+import { colors, fonts } from '../../../lib/theme';
 
 interface FriendShelfItem {
   id: string;
@@ -74,11 +77,9 @@ export default function FriendShelf() {
               <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
             </View>
             {item.status === 'available' ? (
-              <Pressable style={styles.borrowButton} onPress={() => requestToBorrow(item.id)}>
-                <Text style={styles.borrowButtonText}>Ask to borrow</Text>
-              </Pressable>
+              <Button title="Ask to borrow" variant="secondary" onPress={() => requestToBorrow(item.id)} />
             ) : (
-              <Text style={styles.status}>{item.status}</Text>
+              <Chip label={item.status.replace('_', ' ')} />
             )}
           </View>
         )}
@@ -88,25 +89,25 @@ export default function FriendShelf() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  bookTitle: { fontSize: 16, fontWeight: '600' },
-  bookAuthor: { fontSize: 14, color: '#666', marginTop: 2 },
-  status: { fontSize: 12, color: '#999', textTransform: 'uppercase' },
-  borrowButton: {
-    backgroundColor: '#111',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  borrowButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  bookTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  bookAuthor: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyBody: { fontSize: 14, color: '#666', textAlign: 'center', paddingHorizontal: 32 },
+  emptyBody: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
 });

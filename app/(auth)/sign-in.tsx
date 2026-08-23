@@ -1,13 +1,8 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { Button } from '../../components/Button';
+import { colors, fonts, radius } from '../../lib/theme';
 
 type Mode = 'sign-in' | 'sign-up';
 type Message = { type: 'error' | 'success'; text: string };
@@ -71,6 +66,7 @@ export default function SignIn() {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={colors.textFaint}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -80,6 +76,7 @@ export default function SignIn() {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor={colors.textFaint}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -89,6 +86,7 @@ export default function SignIn() {
         <TextInput
           style={styles.input}
           placeholder="Confirm password"
+          placeholderTextColor={colors.textFaint}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -102,13 +100,12 @@ export default function SignIn() {
         </Text>
       )}
 
-      <Pressable style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>{mode === 'sign-in' ? 'Sign in' : 'Sign up'}</Text>
-        )}
-      </Pressable>
+      <Button
+        title={mode === 'sign-in' ? 'Sign in' : 'Sign up'}
+        onPress={handleSubmit}
+        loading={loading}
+        style={styles.submitButton}
+      />
 
       <Pressable onPress={() => switchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}>
         <Text style={styles.toggle}>
@@ -124,54 +121,54 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   title: {
+    fontFamily: fonts.bold,
     fontSize: 32,
-    fontWeight: '700',
+    color: colors.text,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: fonts.regular,
     fontSize: 15,
-    color: '#666',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 32,
   },
   input: {
+    fontFamily: fonts.regular,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: colors.border,
+    borderRadius: radius,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
     fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   errorText: {
-    color: '#c00',
+    fontFamily: fonts.medium,
+    color: colors.danger,
     fontSize: 14,
     marginBottom: 12,
   },
   successText: {
-    color: '#0a7d2c',
+    fontFamily: fonts.medium,
+    color: colors.success,
     fontSize: 14,
     marginBottom: 12,
   },
-  button: {
-    backgroundColor: '#111',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
+  submitButton: {
     marginTop: 8,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   toggle: {
+    fontFamily: fonts.regular,
     textAlign: 'center',
     marginTop: 16,
-    color: '#666',
+    color: colors.textMuted,
+    fontSize: 14,
   },
 });
