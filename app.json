@@ -25,7 +25,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "sharedShelf uses your camera to scan a book's barcode when adding it to your shelf."
+        }
+      ]
     ]
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
@@ -22,9 +23,11 @@ export default function AddBook() {
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-  async function lookupIsbn() {
-    const trimmed = isbn.trim();
+  async function lookupIsbn(overrideIsbn?: string) {
+    const trimmed = (overrideIsbn ?? isbn).trim();
     if (!trimmed) return;
 
     setLookupMessage(null);
@@ -51,6 +54,26 @@ export default function AddBook() {
     } finally {
       setLookingUp(false);
     }
+  }
+
+  async function openScanner() {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert(
+          'Camera access needed',
+          'Enable camera access for sharedShelf in your device settings to scan a barcode, or enter the ISBN manually.'
+        );
+        return;
+      }
+    }
+    setScanning(true);
+  }
+
+  function handleBarcodeScanned(scannedIsbn: string) {
+    setScanning(false);
+    setIsbn(scannedIsbn);
+    lookupIsbn(scannedIsbn);
   }
 
   async function handleAdd() {
@@ -133,6 +156,8 @@ export default function AddBook() {
 
   return (
     <View style={styles.container}>
+      <Button title="Scan barcode" onPress={openScanner} style={styles.scanButton} />
+
       <Text style={styles.label}>ISBN</Text>
       <View style={styles.isbnRow}>
         <TextInput
@@ -145,10 +170,10 @@ export default function AddBook() {
             setLookupMessage(null);
           }}
           keyboardType="numbers-and-punctuation"
-          onSubmitEditing={lookupIsbn}
+          onSubmitEditing={() => lookupIsbn()}
           returnKeyType="search"
         />
-        <Button title="Look up" variant="secondary" onPress={lookupIsbn} loading={lookingUp} />
+        <Button title="Look up" variant="secondary" onPress={() => lookupIsbn()} loading={lookingUp} />
       </View>
       {lookupMessage && <Text style={styles.lookupMessage}>{lookupMessage}</Text>}
 
@@ -181,6 +206,23 @@ export default function AddBook() {
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <Button title="Add to shelf" onPress={handleAdd} loading={loading} style={styles.submit} />
+
+      <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
+        <View style={styles.scannerContainer}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a'] }}
+            onBarcodeScanned={(result) => handleBarcodeScanned(result.data)}
+          />
+          <View style={styles.scannerOverlay}>
+            <Text style={styles.scannerHint}>Point the camera at a book's barcode</Text>
+            <Pressable style={styles.scannerClose} onPress={() => setScanning(false)}>
+              <Text style={styles.scannerCloseText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -190,6 +232,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     padding: 16,
+  },
+  scanButton: {
+    marginBottom: 20,
   },
   label: {
     fontFamily: fonts.semibold,
@@ -227,5 +272,34 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 20,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    alignItems: 'center',
+    gap: 16,
+  },
+  scannerHint: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  scannerClose: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  scannerCloseText: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: colors.text,
   },
 });
