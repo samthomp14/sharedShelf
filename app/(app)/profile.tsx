@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
 
 export default function Profile() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     load();
@@ -43,6 +42,7 @@ export default function Profile() {
 
   async function save() {
     setError(null);
+    setSaved(false);
     setSaving(true);
 
     const { data: userData } = await supabase.auth.getUser();
@@ -64,7 +64,11 @@ export default function Profile() {
       return;
     }
 
-    router.back();
+    setSaved(true);
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
   }
 
   if (loading) {
@@ -73,24 +77,34 @@ export default function Profile() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Username</Text>
-      <Text style={styles.readOnlyValue}>@{username}</Text>
+      <View>
+        <Text style={styles.label}>Username</Text>
+        <Text style={styles.readOnlyValue}>@{username}</Text>
 
-      <Text style={styles.label}>Email</Text>
-      <Text style={styles.readOnlyValue}>{email}</Text>
+        <Text style={styles.label}>Email</Text>
+        <Text style={styles.readOnlyValue}>{email}</Text>
 
-      <Text style={styles.label}>Display name</Text>
-      <TextInput
-        style={inputStyle}
-        placeholder="What friends see instead of your username"
-        placeholderTextColor={colors.textFaint}
-        value={displayName}
-        onChangeText={setDisplayName}
-      />
+        <Text style={styles.label}>Display name</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="What friends see instead of your username"
+          placeholderTextColor={colors.textFaint}
+          value={displayName}
+          onChangeText={(text) => {
+            setDisplayName(text);
+            setSaved(false);
+          }}
+        />
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {saved && <Text style={styles.savedText}>Saved.</Text>}
 
-      <Button title="Save" onPress={save} loading={saving} style={styles.submit} />
+        <Button title="Save" onPress={save} loading={saving} style={styles.submit} />
+      </View>
+
+      <View style={styles.signOutSection}>
+        <Button title="Sign out" variant="secondary" onPress={signOut} />
+      </View>
     </View>
   );
 }
@@ -98,6 +112,7 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'space-between',
     backgroundColor: colors.background,
     padding: 16,
   },
@@ -120,7 +135,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
   },
+  savedText: {
+    fontFamily: fonts.medium,
+    color: colors.success,
+    fontSize: 14,
+    marginTop: 12,
+  },
   submit: {
     marginTop: 20,
+  },
+  signOutSection: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
 });

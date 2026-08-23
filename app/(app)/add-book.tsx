@@ -122,7 +122,13 @@ export default function AddBook() {
       return;
     }
 
-    router.back();
+    setIsbn('');
+    setTitle('');
+    setAuthors('');
+    setCoverUrl(null);
+    setSource('manual');
+    setLookupMessage(null);
+    router.push('/');
   }
 
   return (

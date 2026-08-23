@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Chip } from '../../components/Chip';
@@ -19,7 +19,6 @@ interface IncomingRequest {
 }
 
 export default function MyShelf() {
-  const router = useRouter();
   const [items, setItems] = useState<ShelfItemRow[]>([]);
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,10 +92,6 @@ export default function MyShelf() {
     }
   }
 
-  async function signOut() {
-    await supabase.auth.signOut();
-  }
-
   return (
     <View style={styles.container}>
       <FlatList
@@ -107,13 +102,6 @@ export default function MyShelf() {
         onRefresh={load}
         ListHeaderComponent={
           <View>
-            <Button
-              title="+ Add a book"
-              variant="secondary"
-              onPress={() => router.push('/add-book')}
-              style={styles.addButton}
-            />
-
             {requests.length > 0 && (
               <View style={styles.requestsSection}>
                 <Text style={styles.sectionTitle}>Requests</Text>
@@ -170,15 +158,6 @@ export default function MyShelf() {
           </View>
         )}
       />
-      <View style={styles.footer}>
-        <Button
-          title="Profile"
-          variant="secondary"
-          onPress={() => router.push('/profile')}
-          style={styles.footerButton}
-        />
-        <Button title="Sign out" variant="secondary" onPress={signOut} style={styles.footerButton} />
-      </View>
     </View>
   );
 }
@@ -186,7 +165,6 @@ export default function MyShelf() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
-  addButton: { marginBottom: 16 },
   sectionTitle: {
     fontFamily: fonts.semibold,
     fontSize: 13,
@@ -228,15 +206,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     paddingHorizontal: 32,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 8,
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  footerButton: {
-    flex: 1,
   },
 });
