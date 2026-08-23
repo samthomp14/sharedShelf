@@ -28,6 +28,40 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
    npm start
    ```
 
+## Deploying the web build (Vercel)
+
+The app also runs as a web SPA (`react-native-web`), which can be hosted anywhere
+that serves static files. `vercel.json` is already set up for this — it builds
+with `expo export -p web` and rewrites all paths to `index.html` (needed since
+this is a single-page app: there's no real `/friends/index.html` file, expo-router
+handles that routing client-side).
+
+1. Install the Vercel CLI if you don't have it, and log in (opens your browser):
+
+   ```sh
+   npx vercel login
+   ```
+
+2. In the Vercel dashboard, add these two Environment Variables to the project
+   (Settings → Environment Variables) with the same values as your `.env` —
+   they get baked into the JS bundle at **build** time, so they must be set in
+   Vercel's build environment, not just your local machine:
+   - `EXPO_PUBLIC_SUPABASE_URL`
+   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+3. Deploy from the repo root:
+
+   ```sh
+   npx vercel --prod
+   ```
+
+   Or connect the GitHub repo in the Vercel dashboard instead, for automatic
+   deploys on every push.
+
+Bonus: Vercel gives you HTTPS automatically, which the barcode scanner needs to
+access the camera on a phone browser (camera access is blocked on plain HTTP
+except on `localhost`).
+
 ## Project layout
 
 - `app/` — expo-router screens
