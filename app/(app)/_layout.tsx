@@ -9,18 +9,18 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 17 },
-        // react-navigation normally sizes the tab bar as 49 + insets.bottom,
-        // but that only helps when insets.bottom is real — in a browser
-        // (including device-emulation views), there's no way for the page to
-        // detect a simulated home-indicator overlay, so insets.bottom reports
-        // 0 and labels end up sitting under it. A fixed, generous height that
-        // doesn't depend on insets at all sidesteps that entirely.
+        // Each tab item reserves a fixed 28px icon slot even when
+        // tabBarIcon returns null (hardcoded in the library's TabBarIcon
+        // wrapper style) — so the per-tab content height needs to be at
+        // least ~28px + a real label line-height, or the label collapses.
+        // Content height here is 72 - 6 - 10 = 56px: 28 for the (empty)
+        // icon slot, 28 left over for the label.
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
-          height: 78,
-          paddingTop: 10,
-          paddingBottom: 28,
+          height: 72,
+          paddingTop: 6,
+          paddingBottom: 10,
         },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
         tabBarActiveTintColor: colors.text,
