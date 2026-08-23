@@ -19,6 +19,8 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
    RLS policies, the trigger that creates a `profiles` row on signup (using the
    `username` passed at sign-up), and the triggers that keep a shelf item's status in
    sync as a loan request moves through pending → accepted/declined → returned.
+   Optionally, run `supabase/seed.sql` afterward to add a handful of fake users
+   (with a few books each) you can search for and friend while testing locally.
 3. Install dependencies and start the dev server:
 
    ```sh
@@ -35,8 +37,10 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
       "mark returned" for anything currently on loan
     - `friends.tsx` — accepted friends, incoming friend requests (accept/decline)
     - `friend/[id].tsx` — a friend's shelf, with "ask to borrow"
-    - `add-book.tsx` — manual add-to-shelf form (title/authors/ISBN)
+    - `add-book.tsx` — add-to-shelf form: scan a barcode or type an ISBN
+      (looks up title/authors/cover via Open Library) with manual entry as a fallback
     - `add-friend.tsx` — search by username, send a friend request
+    - `profile.tsx` — view/edit your username, display name, and email; sign out
 - `contexts/AuthContext.tsx` — Supabase session state
 - `lib/supabase.ts` — Supabase client
 - `lib/theme.ts` — shared design tokens (colors, Funnel Sans, sharp-corner/shadow style)
@@ -50,12 +54,12 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
 
 - `supabase/schema.sql` — full schema: `profiles`, `books`, `shelf_items`,
   `friendships`, `loan_requests`, `loans`, RLS policies, and lifecycle triggers
+- `supabase/seed.sql` — optional fake users + books for local testing (dev only)
 
 ## Data model
 
-- **books** — canonical metadata cache (title, authors, cover, ISBN). Currently
-  populated by manual entry; ISBN lookup via Open Library/Google Books is not wired
-  up yet.
+- **books** — canonical metadata cache (title, authors, cover, ISBN), deduped by
+  ISBN. Populated via Open Library lookup (scan or type an ISBN) or manual entry.
 - **shelf_items** — a physical copy a user owns, pointing at a `book`. Status is
   `available` / `requested` / `on_loan`, kept in sync automatically by triggers as
   loan requests are made, accepted/declined, or returned — the client never sets
@@ -70,6 +74,10 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
 
 ## Not yet built
 
-- ISBN/barcode scanning + automatic metadata lookup (add-book is manual-entry only)
 - Push notifications for new requests
 - Cancelling a friend request you sent, or a loan request you sent, from the UI
+- Searching your shelf / a friend's shelf
+- Cover-grid view of a shelf (currently a text list only)
+- Custom sort order / grouping for shelf items
+- A `publisher` field isn't in the schema — search will initially cover
+  title/author only

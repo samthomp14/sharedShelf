@@ -4,6 +4,15 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
+
+function friendlyError(message: string): string {
+  if (message.includes('profiles_username_key')) {
+    return 'That username is already taken.';
+  }
+  return message;
+}
+
 export default function Profile() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -43,6 +52,12 @@ export default function Profile() {
   async function save() {
     setError(null);
     setSaved(false);
+
+    if (!USERNAME_PATTERN.test(username)) {
+      setError('Username must be 3-20 characters: letters, numbers, underscores only.');
+      return;
+    }
+
     setSaving(true);
 
     const { data: userData } = await supabase.auth.getUser();
@@ -54,13 +69,13 @@ export default function Profile() {
 
     const { error: updateError } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim() || null })
+      .update({ username, display_name: displayName.trim() || null })
       .eq('id', uid);
 
     setSaving(false);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(friendlyError(updateError.message));
       return;
     }
 
@@ -79,10 +94,17 @@ export default function Profile() {
     <View style={styles.container}>
       <View>
         <Text style={styles.label}>Username</Text>
-        <Text style={styles.readOnlyValue}>@{username}</Text>
-
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.readOnlyValue}>{email}</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="username"
+          placeholderTextColor={colors.textFaint}
+          value={username}
+          onChangeText={(text) => {
+            setUsername(text);
+            setSaved(false);
+          }}
+          autoCapitalize="none"
+        />
 
         <Text style={styles.label}>Display name</Text>
         <TextInput
@@ -95,6 +117,9 @@ export default function Profile() {
             setSaved(false);
           }}
         />
+
+        <Text style={styles.label}>Email</Text>
+        <Text style={styles.readOnlyValue}>{email}</Text>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
         {saved && <Text style={styles.savedText}>Saved.</Text>}
