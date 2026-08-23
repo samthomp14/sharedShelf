@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
-import { colors, fonts } from '../../../lib/theme';
+import { colors, fonts, inputStyle } from '../../../lib/theme';
 
 interface FriendShelfItem {
   id: string;
@@ -16,6 +16,17 @@ export default function FriendShelf() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [items, setItems] = useState<FriendShelfItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const title = item.book?.title?.toLowerCase() ?? '';
+      const authors = item.book?.authors?.join(' ').toLowerCase() ?? '';
+      return title.includes(q) || authors.includes(q);
+    });
+  }, [items, query]);
 
   const loadShelf = useCallback(async () => {
     if (!id) return;
@@ -58,15 +69,29 @@ export default function FriendShelf() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={loadShelf}
+        ListHeaderComponent={
+          items.length > 0 ? (
+            <TextInput
+              style={[inputStyle, styles.searchInput]}
+              placeholder="Search this shelf by title or author"
+              placeholderTextColor={colors.textFaint}
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize="none"
+            />
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyBody}>This shelf is empty so far.</Text>
+              <Text style={styles.emptyBody}>
+                {items.length === 0 ? 'This shelf is empty so far.' : `No books match "${query}".`}
+              </Text>
             </View>
           ) : null
         }
@@ -91,6 +116,9 @@ export default function FriendShelf() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
+  searchInput: {
+    marginBottom: 16,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

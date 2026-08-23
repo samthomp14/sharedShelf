@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
-import { colors, fonts } from '../../lib/theme';
+import { colors, fonts, inputStyle } from '../../lib/theme';
 
 interface ShelfItemRow {
   id: string;
@@ -23,6 +23,17 @@ export default function MyShelf() {
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const title = item.book?.title?.toLowerCase() ?? '';
+      const authors = item.book?.authors?.join(' ').toLowerCase() ?? '';
+      return title.includes(q) || authors.includes(q);
+    });
+  }, [items, query]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,13 +106,24 @@ export default function MyShelf() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={load}
         ListHeaderComponent={
           <View>
+            {items.length > 0 && (
+              <TextInput
+                style={[inputStyle, styles.searchInput]}
+                placeholder="Search your shelf by title or author"
+                placeholderTextColor={colors.textFaint}
+                value={query}
+                onChangeText={setQuery}
+                autoCapitalize="none"
+              />
+            )}
+
             {requests.length > 0 && (
               <View style={styles.requestsSection}>
                 <Text style={styles.sectionTitle}>Requests</Text>
@@ -137,8 +159,16 @@ export default function MyShelf() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Your shelf is empty</Text>
-              <Text style={styles.emptyBody}>Add the physical books you own to get started.</Text>
+              {items.length === 0 ? (
+                <>
+                  <Text style={styles.emptyTitle}>Your shelf is empty</Text>
+                  <Text style={styles.emptyBody}>
+                    Add the physical books you own to get started.
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.emptyBody}>No books match "{query}".</Text>
+              )}
             </View>
           ) : null
         }
@@ -163,6 +193,9 @@ export default function MyShelf() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, flexGrow: 1 },
+  searchInput: {
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontFamily: fonts.semibold,
     fontSize: 13,
