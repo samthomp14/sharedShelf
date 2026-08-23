@@ -10,8 +10,11 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
 
 ## Getting started
 
-1. Copy `.env.example` to `.env` and fill in your Supabase project's URL and anon key
-   (Project Settings → API in the Supabase dashboard).
+1. Copy `.env.example` to `.env` and fill in:
+   - `EXPO_PUBLIC_SUPABASE_URL` ← your Supabase project's **URL** (from the dashboard)
+   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ← your Supabase project's **Publishable key** (from the dashboard)
+   
+   Both are in Project Settings → API.
 2. Run `supabase/schema.sql` in the Supabase SQL editor to create the tables, enums,
    RLS policies, and the trigger that creates a `profiles` row on signup.
 3. Install dependencies and start the dev server:

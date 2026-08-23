@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -10,23 +9,58 @@ import {
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
+type Mode = 'sign-in' | 'sign-up';
+type Message = { type: 'error' | 'success'; text: string };
+
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [mode, setMode] = useState<Mode>('sign-in');
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setMessage(null);
+    setPassword('');
+    setConfirmPassword('');
+  }
 
   async function handleSubmit() {
-    setLoading(true);
-    const { error } =
-      mode === 'sign-in'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
-    setLoading(false);
+    setMessage(null);
 
-    if (error) {
-      Alert.alert('Something went wrong', error.message);
+    if (mode === 'sign-up' && password !== confirmPassword) {
+      setMessage({ type: 'error', text: "Passwords don't match." });
+      return;
     }
+
+    setLoading(true);
+
+    if (mode === 'sign-in') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage({ type: 'error', text: error.message });
+      }
+    } else {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setMessage({ type: 'error', text: error.message });
+      } else if (!data.session) {
+        // Email confirmation is required — signUp succeeded but there's no
+        // session yet. Tell the user to go check their inbox.
+        setMessage({
+          type: 'success',
+          text: `We sent a confirmation link to ${email}. Click it, then sign in below.`,
+        });
+        switchMode('sign-in');
+      }
+      // If data.session is set, confirmation is disabled on this project and
+      // the AuthProvider's onAuthStateChange listener will pick up the new
+      // session and navigate the user in automatically.
+    }
+
+    setLoading(false);
   }
 
   return (
@@ -49,8 +83,24 @@ export default function SignIn() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        autoComplete="password"
+        autoComplete={mode === 'sign-in' ? 'password' : 'new-password'}
       />
+      {mode === 'sign-up' && (
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          autoComplete="new-password"
+        />
+      )}
+
+      {message && (
+        <Text style={message.type === 'error' ? styles.errorText : styles.successText}>
+          {message.text}
+        </Text>
+      )}
 
       <Pressable style={styles.button} onPress={handleSubmit} disabled={loading}>
         {loading ? (
@@ -60,7 +110,7 @@ export default function SignIn() {
         )}
       </Pressable>
 
-      <Pressable onPress={() => setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}>
+      <Pressable onPress={() => switchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}>
         <Text style={styles.toggle}>
           {mode === 'sign-in' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
         </Text>
@@ -96,6 +146,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
     fontSize: 16,
+  },
+  errorText: {
+    color: '#c00',
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  successText: {
+    color: '#0a7d2c',
+    fontSize: 14,
+    marginBottom: 12,
   },
   button: {
     backgroundColor: '#111',
