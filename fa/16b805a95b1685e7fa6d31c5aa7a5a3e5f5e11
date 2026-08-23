@@ -1,0 +1,27 @@
+app/(app)/add-book.tsx
+  s_88b27d5fe63d8f::t_ee7903a79c944e 1,4-14
+  s_88b27d5fe63d8f::t_a5d80d980f6eed 59-77
+  s_88b27d5fe63d8f::t_39213a2b84b36e 284-285,287-299
+  s_88b27d5fe63d8f::t_f893839f482569 231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "fa16b805a95b1685e7fa6d31c5aa7a5a3e5f5e11",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_88b27d5fe63d8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1349e911-da0e-4635-9ca1-234e1d449c3e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
