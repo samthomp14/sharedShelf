@@ -2,6 +2,8 @@
 // sharp square corners, thin hairline borders with a soft shadow instead of
 // fills, and Funnel Sans throughout.
 
+import type { TextStyle } from 'react-native';
+
 export const colors = {
   text: '#0a0a0a',
   textMuted: '#666666',
@@ -38,4 +40,17 @@ export const shadow = {
   shadowOpacity: 0.08,
   shadowRadius: 3,
   elevation: 1,
+};
+
+export const inputStyle: TextStyle = {
+  fontFamily: fonts.regular,
+  borderWidth: 1,
+  borderColor: colors.border,
+  borderRadius: radius,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  marginBottom: 12,
+  fontSize: 16,
+  color: colors.text,
+  backgroundColor: colors.background,
 };

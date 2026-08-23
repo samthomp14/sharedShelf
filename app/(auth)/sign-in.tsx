@@ -7,7 +7,10 @@ import { colors, fonts, radius } from '../../lib/theme';
 type Mode = 'sign-in' | 'sign-up';
 type Message = { type: 'error' | 'success'; text: string };
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
+
 export default function SignIn() {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,14 +23,31 @@ export default function SignIn() {
     setMessage(null);
     setPassword('');
     setConfirmPassword('');
+    setUsername('');
+  }
+
+  function friendlyError(message: string): string {
+    if (message.includes('profiles_username_key')) {
+      return 'That username is already taken.';
+    }
+    return message;
   }
 
   async function handleSubmit() {
     setMessage(null);
 
-    if (mode === 'sign-up' && password !== confirmPassword) {
-      setMessage({ type: 'error', text: "Passwords don't match." });
-      return;
+    if (mode === 'sign-up') {
+      if (!USERNAME_PATTERN.test(username)) {
+        setMessage({
+          type: 'error',
+          text: 'Username must be 3-20 characters: letters, numbers, underscores only.',
+        });
+        return;
+      }
+      if (password !== confirmPassword) {
+        setMessage({ type: 'error', text: "Passwords don't match." });
+        return;
+      }
     }
 
     setLoading(true);
@@ -38,9 +58,13 @@ export default function SignIn() {
         setMessage({ type: 'error', text: error.message });
       }
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username } },
+      });
       if (error) {
-        setMessage({ type: 'error', text: error.message });
+        setMessage({ type: 'error', text: friendlyError(error.message) });
       } else if (!data.session) {
         // Email confirmation is required — signUp succeeded but there's no
         // session yet. Tell the user to go check their inbox.
@@ -63,6 +87,17 @@ export default function SignIn() {
       <Text style={styles.title}>sharedShelf</Text>
       <Text style={styles.subtitle}>Your friends' shelves, one tap away.</Text>
 
+      {mode === 'sign-up' && (
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor={colors.textFaint}
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoComplete="username"
+        />
+      )}
       <TextInput
         style={styles.input}
         placeholder="Email"

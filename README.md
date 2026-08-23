@@ -15,8 +15,10 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
    - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ← your Supabase project's **Publishable key** (from the dashboard)
    
    Both are in Project Settings → API.
-2. Run `supabase/schema.sql` in the Supabase SQL editor to create the tables, enums,
-   RLS policies, and the trigger that creates a `profiles` row on signup.
+2. Run `supabase/schema.sql` in the Supabase SQL editor. It creates the tables, enums,
+   RLS policies, the trigger that creates a `profiles` row on signup (using the
+   `username` passed at sign-up), and the triggers that keep a shelf item's status in
+   sync as a loan request moves through pending → accepted/declined → returned.
 3. Install dependencies and start the dev server:
 
    ```sh
@@ -27,13 +29,18 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
 ## Project layout
 
 - `app/` — expo-router screens
-  - `(auth)/sign-in.tsx` — email/password sign in and sign up
+  - `(auth)/sign-in.tsx` — sign in, and sign up with username + confirm-password
   - `(app)/` — tab navigator, gated behind an active session
-    - `index.tsx` — My Shelf
-    - `friends.tsx` — accepted friends list
+    - `index.tsx` — My Shelf: your books, incoming loan requests (accept/decline),
+      "mark returned" for anything currently on loan
+    - `friends.tsx` — accepted friends, incoming friend requests (accept/decline)
     - `friend/[id].tsx` — a friend's shelf, with "ask to borrow"
+    - `add-book.tsx` — manual add-to-shelf form (title/authors/ISBN)
+    - `add-friend.tsx` — search by username, send a friend request
 - `contexts/AuthContext.tsx` — Supabase session state
 - `lib/supabase.ts` — Supabase client
+- `lib/theme.ts` — shared design tokens (colors, Funnel Sans, sharp-corner/shadow style)
+- `components/Button.tsx`, `components/Chip.tsx` — shared UI pieces
 - `lib/database.types.ts` — hand-written types matching `supabase/schema.sql`; once the
   project is linked via the Supabase CLI, regenerate with:
 
@@ -42,23 +49,27 @@ have on their shelves, and ask to borrow — hand to hand, no shipping, no stran
   ```
 
 - `supabase/schema.sql` — full schema: `profiles`, `books`, `shelf_items`,
-  `friendships`, `loan_requests`, `loans`, plus RLS policies
+  `friendships`, `loan_requests`, `loans`, RLS policies, and lifecycle triggers
 
 ## Data model
 
-- **books** — canonical metadata cache (title, authors, cover, ISBN), meant to be
-  populated from a lookup API (Open Library primary, Google Books fallback) once
-  ISBN scanning is wired up.
+- **books** — canonical metadata cache (title, authors, cover, ISBN). Currently
+  populated by manual entry; ISBN lookup via Open Library/Google Books is not wired
+  up yet.
 - **shelf_items** — a physical copy a user owns, pointing at a `book`. Status is
-  `available` / `requested` / `on_loan`.
-- **friendships** — accepted connections; shelf visibility is scoped to friends only.
-- **loan_requests** — a friend asking to borrow a shelf item.
-- **loans** — the actual hand-off once a request is accepted; `returned_at` is set
-  when the book comes back.
+  `available` / `requested` / `on_loan`, kept in sync automatically by triggers as
+  loan requests are made, accepted/declined, or returned — the client never sets
+  this directly.
+- **friendships** — `pending`/`accepted` connection between two users; shelf
+  visibility is scoped to accepted friends only.
+- **loan_requests** — a friend asking to borrow a shelf item. Inserting one flips
+  the shelf item to `requested`; accepting creates a `loans` row and flips it to
+  `on_loan`; declining/cancelling flips it back to `available`.
+- **loans** — the actual hand-off once a request is accepted; setting
+  `returned_at` flips the shelf item back to `available`.
 
 ## Not yet built
 
-- ISBN/barcode scanning + book metadata lookup (add-to-shelf flow)
-- Friend requests (the friends screen currently only reads *accepted* friendships)
-- Accepting/declining loan requests and marking a loan returned
+- ISBN/barcode scanning + automatic metadata lookup (add-book is manual-entry only)
 - Push notifications for new requests
+- Cancelling a friend request you sent, or a loan request you sent, from the UI

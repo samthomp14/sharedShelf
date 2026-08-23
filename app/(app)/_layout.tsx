@@ -19,6 +19,8 @@ export default function AppLayout() {
       <Tabs.Screen name="index" options={{ title: 'My Shelf' }} />
       <Tabs.Screen name="friends" options={{ title: 'Friends' }} />
       <Tabs.Screen name="friend/[id]" options={{ href: null, title: 'Shelf' }} />
+      <Tabs.Screen name="add-book" options={{ href: null, title: 'Add a Book' }} />
+      <Tabs.Screen name="add-friend" options={{ href: null, title: 'Add a Friend' }} />
     </Tabs>
   );
 }
