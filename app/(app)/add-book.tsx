@@ -12,6 +12,26 @@ interface OpenLibraryBook {
   cover?: { small?: string; medium?: string; large?: string };
 }
 
+const TITLE_CASE_MINOR_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'so', 'yet',
+  'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'from', 'into', 'over', 'with',
+]);
+
+function toTitleCase(str: string): string {
+  const words = str.split(' ');
+  return words
+    .map((word, i) => {
+      if (!word) return word;
+      const isMinor = TITLE_CASE_MINOR_WORDS.has(word.toLowerCase());
+      const isEdge = i === 0 || i === words.length - 1;
+      if (isMinor && !isEdge) {
+        return word.toLowerCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
 export default function AddBook() {
   const router = useRouter();
   const [isbn, setIsbn] = useState('');
@@ -24,6 +44,7 @@ export default function AddBook() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [coverZoomed, setCoverZoomed] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
   async function lookupIsbn(overrideIsbn?: string) {
@@ -43,7 +64,7 @@ export default function AddBook() {
       if (!found) {
         setLookupMessage("Couldn't find that ISBN — enter the details manually below.");
       } else {
-        setTitle(found.title ?? '');
+        setTitle(found.title ? toTitleCase(found.title) : '');
         setAuthors((found.authors ?? []).map((a) => a.name).join(', '));
         setCoverUrl(found.cover?.medium ?? found.cover?.small ?? null);
         setSource('open_library');
@@ -177,7 +198,11 @@ export default function AddBook() {
       </View>
       {lookupMessage && <Text style={styles.lookupMessage}>{lookupMessage}</Text>}
 
-      {coverUrl && <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="contain" />}
+      {coverUrl && (
+        <Pressable style={styles.coverWrap} onPress={() => setCoverZoomed(true)}>
+          <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="contain" />
+        </Pressable>
+      )}
 
       <Text style={styles.label}>Title</Text>
       <TextInput
@@ -215,13 +240,29 @@ export default function AddBook() {
             barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a'] }}
             onBarcodeScanned={(result) => handleBarcodeScanned(result.data)}
           />
+          <View style={styles.viewfinderWrap} pointerEvents="none">
+            <View style={styles.viewfinder} />
+          </View>
           <View style={styles.scannerOverlay}>
-            <Text style={styles.scannerHint}>Point the camera at a book's barcode</Text>
+            <Text style={styles.scannerHint}>Line the barcode up in the box</Text>
             <Pressable style={styles.scannerClose} onPress={() => setScanning(false)}>
               <Text style={styles.scannerCloseText}>Cancel</Text>
             </Pressable>
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={coverZoomed}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCoverZoomed(false)}
+      >
+        <Pressable style={styles.zoomOverlay} onPress={() => setCoverZoomed(false)}>
+          {coverUrl && (
+            <Image source={{ uri: coverUrl }} style={styles.coverZoomed} resizeMode="contain" />
+          )}
+        </Pressable>
       </Modal>
     </View>
   );
@@ -257,11 +298,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 8,
   },
-  cover: {
-    width: 80,
-    height: 120,
+  coverWrap: {
+    alignItems: 'center',
     marginTop: 12,
     marginBottom: 4,
+  },
+  cover: {
+    width: 110,
+    height: 165,
     backgroundColor: colors.chipBackground,
   },
   errorText: {
@@ -276,6 +320,21 @@ const styles = StyleSheet.create({
   scannerContainer: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  viewfinderWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewfinder: {
+    width: '75%',
+    height: 140,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   scannerOverlay: {
     position: 'absolute',
@@ -301,5 +360,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     fontSize: 14,
     color: colors.text,
+  },
+  zoomOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverZoomed: {
+    width: '80%',
+    height: '60%',
   },
 });
