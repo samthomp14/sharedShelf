@@ -1,0 +1,28 @@
+app/(app)/_layout.tsx
+  s_88b27d5fe63d8f::t_c22f2f30608181 1-2,8
+components/TabBar.tsx
+  s_88b27d5fe63d8f::t_3ed34b77e21a96 1-132
+.gitignore
+  h_4e1d4ad18f97c2 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "68e5bab9d071fd749c0a0eaa6988bb23f7c6878e",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_88b27d5fe63d8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1349e911-da0e-4635-9ca1-234e1d449c3e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
