@@ -68,104 +68,68 @@ export default function AddBook() {
   const [scanning, setScanning] = useState(false);
   const [coverZoomed, setCoverZoomed] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  const coverRef = useRef<View>(null);
+  const coverImageRef = useRef<Image>(null);
   const sourceRectRef = useRef<Rect | null>(null);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const translateXAnim = useRef(new Animated.Value(0)).current;
-  const translateYAnim = useRef(new Animated.Value(0)).current;
+  // Animate the floating image's actual box (left/top/width/height) rather
+  // than a transform — no transform-origin/scale-composition math to get
+  // wrong, and every intermediate value is a real, directly-verifiable
+  // on-screen rect.
+  const animLeft = useRef(new Animated.Value(0)).current;
+  const animTop = useRef(new Animated.Value(0)).current;
+  const animWidth = useRef(new Animated.Value(0)).current;
+  const animHeight = useRef(new Animated.Value(0)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // Compute the scale/translate needed so the (centered, full-size) zoomed
-  // image visually lines up with the small cover's actual on-screen rect.
-  function alignmentFor(rect: Rect) {
+  function centeredTargetRect(): Rect {
     const { width: winW, height: winH } = Dimensions.get('window');
-    const sourceCenterX = rect.x + rect.width / 2;
-    const sourceCenterY = rect.y + rect.height / 2;
     return {
-      scale: rect.width / ZOOMED_COVER_WIDTH,
-      translateX: sourceCenterX - winW / 2,
-      translateY: sourceCenterY - winH / 2,
+      x: (winW - ZOOMED_COVER_WIDTH) / 2,
+      y: (winH - ZOOMED_COVER_HEIGHT) / 2,
+      width: ZOOMED_COVER_WIDTH,
+      height: ZOOMED_COVER_HEIGHT,
     };
   }
 
+  function animateRectTo(
+    rect: Rect,
+    backdropTo: number,
+    duration: number,
+    easing: (t: number) => number,
+    onDone?: () => void
+  ) {
+    Animated.parallel([
+      Animated.timing(animLeft, { toValue: rect.x, duration, easing, useNativeDriver: false }),
+      Animated.timing(animTop, { toValue: rect.y, duration, easing, useNativeDriver: false }),
+      Animated.timing(animWidth, { toValue: rect.width, duration, easing, useNativeDriver: false }),
+      Animated.timing(animHeight, { toValue: rect.height, duration, easing, useNativeDriver: false }),
+      Animated.timing(backdropAnim, { toValue: backdropTo, duration, easing, useNativeDriver: false }),
+    ]).start(onDone);
+  }
+
   function openCoverZoom() {
-    coverRef.current?.measureInWindow((x, y, width, height) => {
-      const rect = { x, y, width, height };
+    // Measure the Image itself, not the Pressable wrapping it — the
+    // wrapper stretches to the full row width (to center its child), so
+    // measuring it instead of the image gave a rect way wider than what's
+    // actually visible on screen.
+    coverImageRef.current?.measureInWindow((x, y, width, height) => {
+      const rect: Rect = { x, y, width, height };
       sourceRectRef.current = rect;
-      const { scale, translateX, translateY } = alignmentFor(rect);
 
       // Start exactly at the cover's current position/size — no reset.
-      scaleAnim.setValue(scale);
-      translateXAnim.setValue(translateX);
-      translateYAnim.setValue(translateY);
+      animLeft.setValue(rect.x);
+      animTop.setValue(rect.y);
+      animWidth.setValue(rect.width);
+      animHeight.setValue(rect.height);
       backdropAnim.setValue(0);
       setCoverZoomed(true);
 
-      // Let the small-state values actually paint one frame before the
-      // tween starts — starting .start() in the same tick as setValue()
-      // can race with the modal's first mount and skip straight to an
-      // interpolated (or default, untransformed) frame instead.
-      requestAnimationFrame(() => {
-        Animated.parallel([
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-          }),
-          Animated.timing(translateXAnim, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-          }),
-          Animated.timing(translateYAnim, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-          }),
-          Animated.timing(backdropAnim, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-          }),
-        ]).start();
-      });
+      animateRectTo(centeredTargetRect(), 1, 280, Easing.out(Easing.cubic));
     });
   }
 
   function closeCoverZoom() {
-    const rect = sourceRectRef.current;
-    const target = rect ? alignmentFor(rect) : { scale: 0.6, translateX: 0, translateY: 0 };
-
-    Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: target.scale,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: false,
-      }),
-      Animated.timing(translateXAnim, {
-        toValue: target.translateX,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: false,
-      }),
-      Animated.timing(translateYAnim, {
-        toValue: target.translateY,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: false,
-      }),
-      Animated.timing(backdropAnim, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: false,
-      }),
-    ]).start(() => {
+    const rect = sourceRectRef.current ?? centeredTargetRect();
+    animateRectTo(rect, 0, 220, Easing.in(Easing.cubic), () => {
       setCoverZoomed(false);
       sourceRectRef.current = null;
     });
@@ -323,8 +287,13 @@ export default function AddBook() {
       {lookupMessage && <Text style={styles.lookupMessage}>{lookupMessage}</Text>}
 
       {coverUrl && (
-        <Pressable ref={coverRef} style={styles.coverWrap} onPress={openCoverZoom}>
-          <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="contain" />
+        <Pressable style={styles.coverWrap} onPress={openCoverZoom}>
+          <Image
+            ref={coverImageRef}
+            source={{ uri: coverUrl }}
+            style={styles.cover}
+            resizeMode="contain"
+          />
         </Pressable>
       )}
 
@@ -384,13 +353,7 @@ export default function AddBook() {
               source={{ uri: coverUrl }}
               style={[
                 styles.coverZoomed,
-                {
-                  transform: [
-                    { translateX: translateXAnim },
-                    { translateY: translateYAnim },
-                    { scale: scaleAnim },
-                  ],
-                },
+                { left: animLeft, top: animTop, width: animWidth, height: animHeight },
               ]}
               resizeMode="contain"
             />
@@ -496,8 +459,6 @@ const styles = StyleSheet.create({
   },
   zoomOverlay: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   zoomBackdrop: {
     position: 'absolute',
@@ -508,7 +469,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   coverZoomed: {
-    width: ZOOMED_COVER_WIDTH,
-    height: ZOOMED_COVER_HEIGHT,
+    position: 'absolute',
+    backgroundColor: colors.chipBackground,
   },
 });
