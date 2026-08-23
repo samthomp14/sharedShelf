@@ -4,6 +4,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   Alert,
   Animated,
+  Dimensions,
+  Easing,
   Image,
   Modal,
   Pressable,
@@ -26,6 +28,16 @@ const TITLE_CASE_MINOR_WORDS = new Set([
   'a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'so', 'yet',
   'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'from', 'into', 'over', 'with',
 ]);
+
+const ZOOMED_COVER_WIDTH = 240;
+const ZOOMED_COVER_HEIGHT = 360;
+
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 function toTitleCase(str: string): string {
   const words = str.split(' ');
@@ -56,24 +68,101 @@ export default function AddBook() {
   const [scanning, setScanning] = useState(false);
   const [coverZoomed, setCoverZoomed] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  const zoomAnim = useRef(new Animated.Value(0)).current;
+  const coverRef = useRef<View>(null);
+  const sourceRectRef = useRef<Rect | null>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const translateXAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // Compute the scale/translate needed so the (centered, full-size) zoomed
+  // image visually lines up with the small cover's actual on-screen rect.
+  function alignmentFor(rect: Rect) {
+    const { width: winW, height: winH } = Dimensions.get('window');
+    const sourceCenterX = rect.x + rect.width / 2;
+    const sourceCenterY = rect.y + rect.height / 2;
+    return {
+      scale: rect.width / ZOOMED_COVER_WIDTH,
+      translateX: sourceCenterX - winW / 2,
+      translateY: sourceCenterY - winH / 2,
+    };
+  }
 
   function openCoverZoom() {
-    setCoverZoomed(true);
-    Animated.spring(zoomAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 80,
-    }).start();
+    coverRef.current?.measureInWindow((x, y, width, height) => {
+      const rect = { x, y, width, height };
+      sourceRectRef.current = rect;
+      const { scale, translateX, translateY } = alignmentFor(rect);
+
+      // Start exactly at the cover's current position/size — no reset.
+      scaleAnim.setValue(scale);
+      translateXAnim.setValue(translateX);
+      translateYAnim.setValue(translateY);
+      backdropAnim.setValue(0);
+      setCoverZoomed(true);
+
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateXAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
   }
 
   function closeCoverZoom() {
-    Animated.timing(zoomAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => setCoverZoomed(false));
+    const rect = sourceRectRef.current;
+    const target = rect ? alignmentFor(rect) : { scale: 0.6, translateX: 0, translateY: 0 };
+
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: target.scale,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateXAnim, {
+        toValue: target.translateX,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: target.translateY,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCoverZoomed(false);
+      sourceRectRef.current = null;
+    });
   }
 
   async function lookupIsbn(overrideIsbn?: string) {
@@ -228,7 +317,7 @@ export default function AddBook() {
       {lookupMessage && <Text style={styles.lookupMessage}>{lookupMessage}</Text>}
 
       {coverUrl && (
-        <Pressable style={styles.coverWrap} onPress={openCoverZoom}>
+        <Pressable ref={coverRef} style={styles.coverWrap} onPress={openCoverZoom}>
           <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="contain" />
         </Pressable>
       )}
@@ -283,15 +372,17 @@ export default function AddBook() {
 
       <Modal visible={coverZoomed} transparent onRequestClose={closeCoverZoom}>
         <Pressable style={styles.zoomOverlay} onPress={closeCoverZoom}>
+          <Animated.View style={[styles.zoomBackdrop, { opacity: backdropAnim }]} />
           {coverUrl && (
             <Animated.Image
               source={{ uri: coverUrl }}
               style={[
                 styles.coverZoomed,
                 {
-                  opacity: zoomAnim,
                   transform: [
-                    { scale: zoomAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+                    { translateX: translateXAnim },
+                    { translateY: translateYAnim },
+                    { scale: scaleAnim },
                   ],
                 },
               ]}
@@ -399,12 +490,19 @@ const styles = StyleSheet.create({
   },
   zoomOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  zoomBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+  },
   coverZoomed: {
-    width: '80%',
-    height: '60%',
+    width: ZOOMED_COVER_WIDTH,
+    height: ZOOMED_COVER_HEIGHT,
   },
 });
