@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
@@ -46,6 +56,25 @@ export default function AddBook() {
   const [scanning, setScanning] = useState(false);
   const [coverZoomed, setCoverZoomed] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const zoomAnim = useRef(new Animated.Value(0)).current;
+
+  function openCoverZoom() {
+    setCoverZoomed(true);
+    Animated.spring(zoomAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 80,
+    }).start();
+  }
+
+  function closeCoverZoom() {
+    Animated.timing(zoomAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => setCoverZoomed(false));
+  }
 
   async function lookupIsbn(overrideIsbn?: string) {
     const trimmed = (overrideIsbn ?? isbn).trim();
@@ -199,7 +228,7 @@ export default function AddBook() {
       {lookupMessage && <Text style={styles.lookupMessage}>{lookupMessage}</Text>}
 
       {coverUrl && (
-        <Pressable style={styles.coverWrap} onPress={() => setCoverZoomed(true)}>
+        <Pressable style={styles.coverWrap} onPress={openCoverZoom}>
           <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="contain" />
         </Pressable>
       )}
@@ -252,15 +281,22 @@ export default function AddBook() {
         </View>
       </Modal>
 
-      <Modal
-        visible={coverZoomed}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setCoverZoomed(false)}
-      >
-        <Pressable style={styles.zoomOverlay} onPress={() => setCoverZoomed(false)}>
+      <Modal visible={coverZoomed} transparent onRequestClose={closeCoverZoom}>
+        <Pressable style={styles.zoomOverlay} onPress={closeCoverZoom}>
           {coverUrl && (
-            <Image source={{ uri: coverUrl }} style={styles.coverZoomed} resizeMode="contain" />
+            <Animated.Image
+              source={{ uri: coverUrl }}
+              style={[
+                styles.coverZoomed,
+                {
+                  opacity: zoomAnim,
+                  transform: [
+                    { scale: zoomAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+                  ],
+                },
+              ]}
+              resizeMode="contain"
+            />
           )}
         </Pressable>
       </Modal>
