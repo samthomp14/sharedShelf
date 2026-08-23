@@ -1,0 +1,33 @@
+app/(app)/add-book.tsx
+  s_88b27d5fe63d8f::t_16ce7af52333e3 47
+  s_88b27d5fe63d8f::t_efc5fb4e53a4fa 301-302,305-308
+  s_88b27d5fe63d8f::t_d0fd7ad7fabba0 325-329
+  s_88b27d5fe63d8f::t_d2bccfd742d267 243-245,247,254-265
+  s_88b27d5fe63d8f::t_1f88643907a532 201-205
+  s_88b27d5fe63d8f::t_27b8dbe8c25ba3 15-34
+  s_88b27d5fe63d8f::t_b4ec211fbc4501 364-373
+  s_88b27d5fe63d8f::t_d93ccc630cefe5 67
+  s_88b27d5fe63d8f::t_8978a6add9dc49 324,330-338
+  s_88b27d5fe63d8f::t_d414e58d554e95 266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "11ef665f9249001d4cb01f16919b53df7ddc1a78",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_88b27d5fe63d8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1349e911-da0e-4635-9ca1-234e1d449c3e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
