@@ -9,11 +9,19 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 17 },
-        // Deliberately no explicit height/padding here — react-navigation
-        // already computes a safe-area-aware tab bar height internally.
-        // Setting our own competes with that and can push the bar (and its
-        // labels) off-screen entirely depending on platform/inset timing.
-        tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
+        // react-navigation normally sizes the tab bar as 49 + insets.bottom,
+        // but that only helps when insets.bottom is real — in a browser
+        // (including device-emulation views), there's no way for the page to
+        // detect a simulated home-indicator overlay, so insets.bottom reports
+        // 0 and labels end up sitting under it. A fixed, generous height that
+        // doesn't depend on insets at all sidesteps that entirely.
+        tabBarStyle: {
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
+          height: 78,
+          paddingTop: 10,
+          paddingBottom: 28,
+        },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textFaint,

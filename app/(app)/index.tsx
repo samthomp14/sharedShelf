@@ -132,8 +132,6 @@ export default function MyShelf() {
                 ))}
               </View>
             )}
-
-            <Text style={styles.sectionTitle}>My Shelf</Text>
           </View>
         }
         ListEmptyComponent={
