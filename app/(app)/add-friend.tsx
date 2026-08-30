@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
@@ -11,6 +12,7 @@ interface ProfileResult {
 }
 
 export default function AddFriend() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProfileResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -115,10 +117,10 @@ export default function AddFriend() {
         }
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <View style={{ flex: 1 }}>
+            <Pressable style={{ flex: 1 }} onPress={() => router.push(`/profile/${item.id}`)}>
               <Text style={styles.name}>{item.display_name ?? item.username}</Text>
               <Text style={styles.username}>@{item.username}</Text>
-            </View>
+            </Pressable>
             <Button
               title="Add"
               variant="secondary"

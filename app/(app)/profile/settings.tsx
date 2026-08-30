@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { supabase } from '../../lib/supabase';
-import { Button } from '../../components/Button';
-import { colors, fonts, inputStyle } from '../../lib/theme';
+import { supabase } from '../../../lib/supabase';
+import { Button } from '../../../components/Button';
+import { colors, fonts, inputStyle } from '../../../lib/theme';
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 
@@ -13,10 +13,11 @@ function friendlyError(message: string): string {
   return message;
 }
 
-export default function Profile() {
+export default function ProfileSettings() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,13 +39,14 @@ export default function Profile() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('username, display_name')
+      .select('username, display_name, bio')
       .eq('id', uid)
       .single();
 
     if (data) {
       setUsername(data.username);
       setDisplayName(data.display_name ?? '');
+      setBio(data.bio ?? '');
     }
     setLoading(false);
   }
@@ -69,7 +71,7 @@ export default function Profile() {
 
     const { error: updateError } = await supabase
       .from('profiles')
-      .update({ username, display_name: displayName.trim() || null })
+      .update({ username, display_name: displayName.trim() || null, bio: bio.trim() || null })
       .eq('id', uid);
 
     setSaving(false);
@@ -118,6 +120,19 @@ export default function Profile() {
           }}
         />
 
+        <Text style={styles.label}>Bio</Text>
+        <TextInput
+          style={[inputStyle, styles.bioInput]}
+          placeholder="A line or two about your shelf"
+          placeholderTextColor={colors.textFaint}
+          value={bio}
+          onChangeText={(text) => {
+            setBio(text);
+            setSaved(false);
+          }}
+          multiline
+        />
+
         <Text style={styles.label}>Email</Text>
         <Text style={styles.readOnlyValue}>{email}</Text>
 
@@ -147,6 +162,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 6,
     marginTop: 12,
+  },
+  bioInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
   readOnlyValue: {
     fontFamily: fonts.regular,

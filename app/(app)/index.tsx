@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { supabase } from '../../lib/supabase';
 import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
+import { AuthorList } from '../../components/AuthorList';
 import { colors, fonts, inputStyle } from '../../lib/theme';
 
 type ViewMode = 'covers' | 'list';
@@ -11,7 +13,8 @@ type ViewMode = 'covers' | 'list';
 interface ShelfItemRow {
   id: string;
   status: string;
-  book: { title: string; authors: string[]; cover_url: string | null } | null;
+  sort_order: number;
+  book: { id: string; title: string; authors: string[]; cover_url: string | null } | null;
 }
 
 interface IncomingRequest {
@@ -21,6 +24,7 @@ interface IncomingRequest {
 }
 
 export default function MyShelf() {
+  const router = useRouter();
   const [items, setItems] = useState<ShelfItemRow[]>([]);
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,8 @@ export default function MyShelf() {
     });
   }, [items, query]);
 
+  const canReorder = viewMode === 'list' && !query.trim();
+
   const load = useCallback(async () => {
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -50,8 +56,9 @@ export default function MyShelf() {
     const [shelfResult, requestsResult] = await Promise.all([
       supabase
         .from('shelf_items')
-        .select('id, status, book:books(title, authors, cover_url)')
+        .select('id, status, sort_order, book:books(id, title, authors, cover_url)')
         .eq('owner_id', uid)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false }),
       supabase
         .from('loan_requests')
@@ -106,135 +113,165 @@ export default function MyShelf() {
     }
   }
 
+  function handleDragEnd(data: ShelfItemRow[]) {
+    const reordered = data.map((item, index) => ({ ...item, sort_order: index }));
+    setItems(reordered);
+    Promise.all(
+      reordered.map((item) =>
+        supabase.from('shelf_items').update({ sort_order: item.sort_order }).eq('id', item.id)
+      )
+    );
+  }
+
+  function renderCard(item: ShelfItemRow, drag?: () => void, isActive?: boolean) {
+    return viewMode === 'covers' ? (
+      <Pressable
+        style={[styles.coverCard, isActive && styles.activeRow]}
+        onPress={() => item.book && router.push(`/book/${item.book.id}`)}
+      >
+        {item.book?.cover_url ? (
+          <Image source={{ uri: item.book.cover_url }} style={styles.coverImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.spinePlaceholder}>
+            <Text style={styles.spineTitle} numberOfLines={5}>
+              {item.book?.title ?? 'Unknown title'}
+            </Text>
+          </View>
+        )}
+        <Text style={styles.coverCardTitle} numberOfLines={2}>
+          {item.book?.title ?? 'Unknown title'}
+        </Text>
+        {item.status !== 'available' && <Chip label={item.status.replace('_', ' ')} />}
+      </Pressable>
+    ) : (
+      <Pressable
+        style={[styles.row, isActive && styles.activeRow]}
+        onLongPress={drag}
+        disabled={isActive}
+      >
+        <View style={{ flex: 1 }}>
+          <Pressable onPress={() => item.book && router.push(`/book/${item.book.id}`)}>
+            <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
+          </Pressable>
+          <AuthorList authors={item.book?.authors ?? []} textStyle={styles.bookAuthor} />
+        </View>
+        {item.status === 'on_loan' ? (
+          <Button title="Mark returned" variant="secondary" onPress={() => markReturned(item.id)} />
+        ) : (
+          <Chip label={item.status.replace('_', ' ')} />
+        )}
+      </Pressable>
+    );
+  }
+
+  const listHeader = (
+    <View>
+      {items.length > 0 && (
+        <View style={styles.viewToggle}>
+          <Pressable
+            style={[styles.toggleButton, viewMode === 'covers' && styles.toggleButtonActive]}
+            onPress={() => setViewMode('covers')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'covers' && styles.toggleTextActive]}>
+              Covers
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
+            onPress={() => setViewMode('list')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
+              List
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {items.length > 0 && (
+        <TextInput
+          style={[inputStyle, styles.searchInput]}
+          placeholder="Search your shelf by title or author"
+          placeholderTextColor={colors.textFaint}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+        />
+      )}
+
+      {requests.length > 0 && (
+        <View style={styles.requestsSection}>
+          <Text style={styles.sectionTitle}>Requests</Text>
+          {requests.map((req) => (
+            <View key={req.id} style={styles.requestRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bookTitle}>{req.shelf_item?.book?.title ?? 'Unknown title'}</Text>
+                <Text style={styles.bookAuthor}>
+                  {req.requester?.display_name ?? req.requester?.username} wants to borrow this
+                </Text>
+              </View>
+              <View style={styles.requestActions}>
+                <Button
+                  title="Decline"
+                  variant="secondary"
+                  onPress={() => respond(req.id, 'declined')}
+                  loading={respondingId === req.id}
+                />
+                <Button
+                  title="Accept"
+                  onPress={() => respond(req.id, 'accepted')}
+                  loading={respondingId === req.id}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+
+  const emptyComponent = !loading ? (
+    <View style={styles.empty}>
+      {items.length === 0 ? (
+        <>
+          <Text style={styles.emptyTitle}>Your shelf is empty</Text>
+          <Text style={styles.emptyBody}>Add the physical books you own to get started.</Text>
+        </>
+      ) : (
+        <Text style={styles.emptyBody}>No books match "{query}".</Text>
+      )}
+    </View>
+  ) : null;
+
   return (
     <View style={styles.container}>
-      <FlatList
-        key={viewMode}
-        data={filteredItems}
-        keyExtractor={(item) => item.id}
-        numColumns={viewMode === 'covers' ? 3 : 1}
-        columnWrapperStyle={viewMode === 'covers' ? styles.gridRow : undefined}
-        contentContainerStyle={styles.list}
-        refreshing={loading}
-        onRefresh={load}
-        ListHeaderComponent={
-          <View>
-            {items.length > 0 && (
-              <View style={styles.viewToggle}>
-                <Pressable
-                  style={[styles.toggleButton, viewMode === 'covers' && styles.toggleButtonActive]}
-                  onPress={() => setViewMode('covers')}
-                >
-                  <Text
-                    style={[styles.toggleText, viewMode === 'covers' && styles.toggleTextActive]}
-                  >
-                    Covers
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
-                  onPress={() => setViewMode('list')}
-                >
-                  <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
-                    List
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-
-            {items.length > 0 && (
-              <TextInput
-                style={[inputStyle, styles.searchInput]}
-                placeholder="Search your shelf by title or author"
-                placeholderTextColor={colors.textFaint}
-                value={query}
-                onChangeText={setQuery}
-                autoCapitalize="none"
-              />
-            )}
-
-            {requests.length > 0 && (
-              <View style={styles.requestsSection}>
-                <Text style={styles.sectionTitle}>Requests</Text>
-                {requests.map((req) => (
-                  <View key={req.id} style={styles.requestRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.bookTitle}>
-                        {req.shelf_item?.book?.title ?? 'Unknown title'}
-                      </Text>
-                      <Text style={styles.bookAuthor}>
-                        {req.requester?.display_name ?? req.requester?.username} wants to borrow this
-                      </Text>
-                    </View>
-                    <View style={styles.requestActions}>
-                      <Button
-                        title="Decline"
-                        variant="secondary"
-                        onPress={() => respond(req.id, 'declined')}
-                        loading={respondingId === req.id}
-                      />
-                      <Button
-                        title="Accept"
-                        onPress={() => respond(req.id, 'accepted')}
-                        loading={respondingId === req.id}
-                      />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.empty}>
-              {items.length === 0 ? (
-                <>
-                  <Text style={styles.emptyTitle}>Your shelf is empty</Text>
-                  <Text style={styles.emptyBody}>
-                    Add the physical books you own to get started.
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.emptyBody}>No books match "{query}".</Text>
-              )}
-            </View>
-          ) : null
-        }
-        renderItem={({ item }) =>
-          viewMode === 'covers' ? (
-            <View style={styles.coverCard}>
-              {item.book?.cover_url ? (
-                <Image source={{ uri: item.book.cover_url }} style={styles.coverImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.spinePlaceholder}>
-                  <Text style={styles.spineTitle} numberOfLines={5}>
-                    {item.book?.title ?? 'Unknown title'}
-                  </Text>
-                </View>
-              )}
-              <Text style={styles.coverCardTitle} numberOfLines={2}>
-                {item.book?.title ?? 'Unknown title'}
-              </Text>
-              {item.status !== 'available' && (
-                <Chip label={item.status.replace('_', ' ')} />
-              )}
-            </View>
-          ) : (
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
-                <Text style={styles.bookAuthor}>{item.book?.authors?.join(', ')}</Text>
-              </View>
-              {item.status === 'on_loan' ? (
-                <Button title="Mark returned" variant="secondary" onPress={() => markReturned(item.id)} />
-              ) : (
-                <Chip label={item.status.replace('_', ' ')} />
-              )}
-            </View>
-          )
-        }
-      />
+      {canReorder ? (
+        <DraggableFlatList
+          key={viewMode}
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={emptyComponent}
+          onDragEnd={({ data }) => handleDragEnd(data)}
+          renderItem={({ item, drag, isActive }: RenderItemParams<ShelfItemRow>) =>
+            renderCard(item, drag, isActive)
+          }
+        />
+      ) : (
+        <FlatList
+          key={viewMode}
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
+          numColumns={viewMode === 'covers' ? 3 : 1}
+          columnWrapperStyle={viewMode === 'covers' ? styles.gridRow : undefined}
+          contentContainerStyle={styles.list}
+          refreshing={loading}
+          onRefresh={load}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={emptyComponent}
+          renderItem={({ item }) => renderCard(item)}
+        />
+      )}
     </View>
   );
 }
@@ -332,6 +369,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  activeRow: {
+    backgroundColor: colors.chipBackground,
   },
   bookTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   bookAuthor: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },

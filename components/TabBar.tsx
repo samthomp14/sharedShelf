@@ -29,7 +29,20 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   });
 
   const activeRoute = state.routes[state.index];
-  const activeMeasurement = measurements[activeRoute.key];
+  const isActiveVisible = visibleRoutes.some((route) => route.key === activeRoute.key);
+
+  // Hidden routes (href: null, e.g. profile/settings, book/[id]) have no tab
+  // bar item to measure — keep the indicator on whichever visible tab it was
+  // last on instead of letting it snap to a stale/unrelated measurement.
+  const lastVisibleKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isActiveVisible) {
+      lastVisibleKeyRef.current = activeRoute.key;
+    }
+  }, [isActiveVisible, activeRoute.key]);
+
+  const highlightKey = isActiveVisible ? activeRoute.key : lastVisibleKeyRef.current;
+  const activeMeasurement = highlightKey ? measurements[highlightKey] : undefined;
 
   useEffect(() => {
     if (!activeMeasurement) return;
@@ -70,7 +83,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         {visibleRoutes.map((route) => {
           const { options } = descriptors[route.key];
           const label = typeof options.title === 'string' ? options.title : route.name;
-          const focused = route.key === activeRoute.key;
+          const focused = route.key === highlightKey;
 
           return (
             <Pressable

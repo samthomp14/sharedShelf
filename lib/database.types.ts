@@ -9,7 +9,16 @@ export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled
 export interface Database {
   public: {
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      are_friends: {
+        Args: { a: string; b: string };
+        Returns: boolean;
+      };
+      friend_count: {
+        Args: { target: string };
+        Returns: number;
+      };
+    };
     Tables: {
       profiles: {
         Row: {
@@ -17,6 +26,7 @@ export interface Database {
           username: string;
           display_name: string | null;
           avatar_url: string | null;
+          bio: string | null;
           created_at: string;
         };
         Insert: {
@@ -24,6 +34,7 @@ export interface Database {
           username: string;
           display_name?: string | null;
           avatar_url?: string | null;
+          bio?: string | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
@@ -71,6 +82,24 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['friendships']['Insert']>;
         Relationships: [];
       };
+      shelf_groups: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['shelf_groups']['Insert']>;
+        Relationships: [];
+      };
       shelf_items: {
         Row: {
           id: string;
@@ -78,6 +107,8 @@ export interface Database {
           book_id: string;
           status: ShelfItemStatus;
           visibility: 'friends' | 'private';
+          group_id: string | null;
+          sort_order: number;
           created_at: string;
         };
         Insert: {
@@ -86,6 +117,8 @@ export interface Database {
           book_id: string;
           status?: ShelfItemStatus;
           visibility?: 'friends' | 'private';
+          group_id?: string | null;
+          sort_order?: number;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['shelf_items']['Insert']>;

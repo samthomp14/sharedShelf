@@ -149,7 +149,7 @@ export default function Friends() {
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => router.push(`/friend/${item.friendId}`)}>
+          <Pressable style={styles.row} onPress={() => router.push(`/profile/${item.friendId}`)}>
             <Text style={styles.name}>{item.displayName ?? item.username}</Text>
             <Text style={styles.username}>@{item.username}</Text>
           </Pressable>

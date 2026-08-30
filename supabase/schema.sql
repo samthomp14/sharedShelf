@@ -10,6 +10,7 @@ create table public.profiles (
   username text unique not null,
   display_name text,
   avatar_url text,
+  bio text,
   created_at timestamptz not null default now()
 );
 
@@ -143,6 +144,51 @@ $$;
 
 revoke execute on function public.are_friends(uuid, uuid) from public, anon;
 
+-- Helper: how many accepted friends does a user have? The friendships
+-- select policy only exposes rows the caller is part of, so a profile
+-- page can't count another user's friends directly — this exposes just
+-- the count via security definer, same anon lockdown as are_friends.
+create function public.friend_count(target uuid)
+returns integer
+language sql
+security definer set search_path = public
+stable
+as $$
+  select count(*)::integer from public.friendships
+  where status = 'accepted'
+    and (requester_id = target or addressee_id = target);
+$$;
+
+revoke execute on function public.friend_count(uuid) from public, anon;
+
+-- ============================================================
+-- shelf_groups: a user's own custom categories for organizing
+-- their shelf (e.g. "Sci-Fi", "To Reread"). Visible to friends
+-- browsing the shelf, editable only by the owner.
+-- ============================================================
+create table public.shelf_groups (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index shelf_groups_owner_id_idx on public.shelf_groups (owner_id);
+
+alter table public.shelf_groups enable row level security;
+
+create policy "friends can see visible shelf groups"
+  on public.shelf_groups for select
+  to authenticated
+  using (public.are_friends((select auth.uid()), owner_id));
+
+create policy "owners manage their own shelf groups"
+  on public.shelf_groups for all
+  to authenticated
+  using ((select auth.uid()) = owner_id)
+  with check ((select auth.uid()) = owner_id);
+
 -- ============================================================
 -- shelf_items: a physical copy a user owns
 -- ============================================================
@@ -154,11 +200,14 @@ create table public.shelf_items (
   book_id uuid not null references public.books (id) on delete restrict,
   status public.shelf_item_status not null default 'available',
   visibility text not null default 'friends' check (visibility in ('friends', 'private')),
+  group_id uuid references public.shelf_groups (id) on delete set null,
+  sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );
 
 create index shelf_items_owner_id_idx on public.shelf_items (owner_id);
 create index shelf_items_book_id_idx on public.shelf_items (book_id);
+create index shelf_items_group_id_idx on public.shelf_items (group_id);
 
 alter table public.shelf_items enable row level security;
 
