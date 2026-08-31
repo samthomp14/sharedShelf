@@ -1,0 +1,30 @@
+app/(app)/index.tsx
+  s_92d3aea12c5ddc::t_41b98178cabbbf 300-312
+  s_92d3aea12c5ddc::t_9a61de6b8b4f78 462
+  s_92d3aea12c5ddc::t_f1785f289c9c0e 3,5,14-20,26-31,41,44-52,62,65,74,77,84-95,117,124,130-132,139,147,172,175,191,211,214,225,228,293-299,313-338,350,355,375-392,395-460,463,469,473-477,479-480,500,502-503,507-509,516-517,520-522,530-548
+  s_92d3aea12c5ddc::t_20889e70833698 339,343
+  s_92d3aea12c5ddc::t_69d98746d026f0 478
+  s_92d3aea12c5ddc::t_6b35c54897bb35 394
+  s_92d3aea12c5ddc::t_f7566e76c27135 519,523,529
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "96da3cf6b9d2b54a54f4baa42fc5b188a5931476",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_92d3aea12c5ddc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8d10346-c905-4551-bf43-46d19135b64c",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
