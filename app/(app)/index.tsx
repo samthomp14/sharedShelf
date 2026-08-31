@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { InlineLink } from '../../components/InlineLink';
 import { timeAgo } from '../../lib/time';
@@ -10,14 +11,24 @@ import { colors, fonts } from '../../lib/theme';
 interface LoanRequestNeedsYou {
   id: string;
   created_at: string;
-  requester: { id: string; username: string; display_name: string | null } | null;
-  shelf_item: { book: { id: string; title: string } | null } | null;
+  requester: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
+  shelf_item: { book: { id: string; title: string; cover_url: string | null } | null } | null;
 }
 
 interface FriendRequestNeedsYou {
   id: string;
   created_at: string;
-  requester: { id: string; username: string; display_name: string | null } | null;
+  requester: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 type FeedEvent =
@@ -27,10 +38,19 @@ type FeedEvent =
       kind: 'shelf_add';
       actorId: string;
       actorName: string;
+      actorAvatarUrl: string | null;
       bookId: string;
       bookTitle: string;
+      bookCoverUrl: string | null;
     }
-  | { key: string; timestamp: string; kind: 'new_friend'; friendId: string; friendName: string }
+  | {
+      key: string;
+      timestamp: string;
+      kind: 'new_friend';
+      friendId: string;
+      friendName: string;
+      friendAvatarUrl: string | null;
+    }
   | {
       key: string;
       timestamp: string;
@@ -39,8 +59,10 @@ type FeedEvent =
       loanId: string;
       counterpartId: string;
       counterpartName: string;
+      counterpartAvatarUrl: string | null;
       bookId: string;
       bookTitle: string;
+      bookCoverUrl: string | null;
     }
   | {
       key: string;
@@ -49,12 +71,26 @@ type FeedEvent =
       role: 'lender' | 'borrower';
       counterpartId: string;
       counterpartName: string;
+      counterpartAvatarUrl: string | null;
       bookId: string;
       bookTitle: string;
+      bookCoverUrl: string | null;
     };
 
 function personName(p: { username: string; display_name: string | null } | null | undefined) {
   return p?.display_name ?? p?.username ?? 'Someone';
+}
+
+function CoverThumb({ url, title }: { url: string | null; title: string }) {
+  return url ? (
+    <Image source={{ uri: url }} style={styles.cover} resizeMode="cover" />
+  ) : (
+    <View style={styles.coverPlaceholder}>
+      <Text style={styles.coverPlaceholderText} numberOfLines={4}>
+        {title}
+      </Text>
+    </View>
+  );
 }
 
 export default function Activity() {
@@ -78,27 +114,29 @@ export default function Activity() {
       supabase
         .from('loan_requests')
         .select(
-          'id, created_at, requester:profiles(id, username, display_name), shelf_item:shelf_items!inner(id, owner_id, book:books(id, title))'
+          'id, created_at, requester:profiles(id, username, display_name, avatar_url), shelf_item:shelf_items!inner(id, owner_id, book:books(id, title, cover_url))'
         )
         .eq('status', 'pending')
         .eq('shelf_item.owner_id', uid),
       supabase
         .from('friendships')
         .select(
-          'id, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name)'
+          'id, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url)'
         )
         .eq('status', 'pending')
         .eq('addressee_id', uid),
       supabase
         .from('shelf_items')
-        .select('id, created_at, owner:profiles(id, username, display_name), book:books(id, title)')
+        .select(
+          'id, created_at, owner:profiles(id, username, display_name, avatar_url), book:books(id, title, cover_url)'
+        )
         .neq('owner_id', uid)
         .order('created_at', { ascending: false })
         .limit(30),
       supabase
         .from('friendships')
         .select(
-          'id, requester_id, addressee_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name)'
+          'id, requester_id, addressee_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name, avatar_url)'
         )
         .eq('status', 'accepted')
         .order('responded_at', { ascending: false })
@@ -106,7 +144,7 @@ export default function Activity() {
       supabase
         .from('loans')
         .select(
-          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(id, title)), lender:profiles!loans_lender_id_fkey(id, username, display_name), borrower:profiles!loans_borrower_id_fkey(id, username, display_name)'
+          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(id, title, cover_url)), lender:profiles!loans_lender_id_fkey(id, username, display_name, avatar_url), borrower:profiles!loans_borrower_id_fkey(id, username, display_name, avatar_url)'
         )
         .or(`lender_id.eq.${uid},borrower_id.eq.${uid}`)
         .order('started_at', { ascending: false })
@@ -131,8 +169,10 @@ export default function Activity() {
           kind: 'shelf_add',
           actorId: row.owner.id,
           actorName: personName(row.owner),
+          actorAvatarUrl: row.owner.avatar_url,
           bookId: row.book.id,
           bookTitle: row.book.title,
+          bookCoverUrl: row.book.cover_url,
         });
       }
     }
@@ -148,6 +188,7 @@ export default function Activity() {
           kind: 'new_friend',
           friendId: friend.id,
           friendName: personName(friend),
+          friendAvatarUrl: friend.avatar_url,
         });
       }
     }
@@ -167,8 +208,10 @@ export default function Activity() {
             role,
             counterpartId: counterpart.id,
             counterpartName: personName(counterpart),
+            counterpartAvatarUrl: counterpart.avatar_url,
             bookId: book.id,
             bookTitle: book.title,
+            bookCoverUrl: book.cover_url,
           });
         } else {
           merged.push({
@@ -179,8 +222,10 @@ export default function Activity() {
             loanId: row.id,
             counterpartId: counterpart.id,
             counterpartName: personName(counterpart),
+            counterpartAvatarUrl: counterpart.avatar_url,
             bookId: book.id,
             bookTitle: book.title,
+            bookCoverUrl: book.cover_url,
           });
         }
       }
@@ -245,57 +290,72 @@ export default function Activity() {
           {loanRequests.map((req) => {
             const book = req.shelf_item?.book;
             return (
-              <View key={req.id} style={styles.needsYouRow}>
-                <Text style={styles.needsYouText}>
+              <View key={req.id} style={styles.row}>
+                <Avatar
+                  avatarUrl={req.requester?.avatar_url}
+                  label={personName(req.requester)}
+                  size={40}
+                />
+                <View style={styles.rowMiddle}>
+                  <Text style={styles.eventText}>
+                    <InlineLink href={`/profile/${req.requester?.id}`}>
+                      {personName(req.requester)}
+                    </InlineLink>{' '}
+                    wants to borrow "
+                    {book ? (
+                      <InlineLink href={`/book/${book.id}`}>{book.title}</InlineLink>
+                    ) : (
+                      'a book'
+                    )}
+                    "
+                  </Text>
+                  <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
+                  <View style={styles.needsYouActions}>
+                    <Button
+                      title="Decline"
+                      variant="secondary"
+                      onPress={() => respondLoanRequest(req.id, 'declined')}
+                      loading={actingId === req.id}
+                    />
+                    <Button
+                      title="Accept"
+                      onPress={() => respondLoanRequest(req.id, 'accepted')}
+                      loading={actingId === req.id}
+                    />
+                  </View>
+                </View>
+                {book && <CoverThumb url={book.cover_url} title={book.title} />}
+              </View>
+            );
+          })}
+          {friendRequests.map((req) => (
+            <View key={req.id} style={styles.row}>
+              <Avatar
+                avatarUrl={req.requester?.avatar_url}
+                label={personName(req.requester)}
+                size={40}
+              />
+              <View style={styles.rowMiddle}>
+                <Text style={styles.eventText}>
                   <InlineLink href={`/profile/${req.requester?.id}`}>
                     {personName(req.requester)}
                   </InlineLink>{' '}
-                  wants to borrow "
-                  {book ? (
-                    <InlineLink href={`/book/${book.id}`}>{book.title}</InlineLink>
-                  ) : (
-                    'a book'
-                  )}
-                  "
+                  sent you a friend request
                 </Text>
                 <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
                 <View style={styles.needsYouActions}>
                   <Button
                     title="Decline"
                     variant="secondary"
-                    onPress={() => respondLoanRequest(req.id, 'declined')}
+                    onPress={() => respondFriendRequest(req.id, 'decline')}
                     loading={actingId === req.id}
                   />
                   <Button
                     title="Accept"
-                    onPress={() => respondLoanRequest(req.id, 'accepted')}
+                    onPress={() => respondFriendRequest(req.id, 'accept')}
                     loading={actingId === req.id}
                   />
                 </View>
-              </View>
-            );
-          })}
-          {friendRequests.map((req) => (
-            <View key={req.id} style={styles.needsYouRow}>
-              <Text style={styles.needsYouText}>
-                <InlineLink href={`/profile/${req.requester?.id}`}>
-                  {personName(req.requester)}
-                </InlineLink>{' '}
-                sent you a friend request
-              </Text>
-              <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
-              <View style={styles.needsYouActions}>
-                <Button
-                  title="Decline"
-                  variant="secondary"
-                  onPress={() => respondFriendRequest(req.id, 'decline')}
-                  loading={actingId === req.id}
-                />
-                <Button
-                  title="Accept"
-                  onPress={() => respondFriendRequest(req.id, 'accept')}
-                  loading={actingId === req.id}
-                />
               </View>
             </View>
           ))}
@@ -312,78 +372,112 @@ export default function Activity() {
             </Text>
           </View>
         ) : (
-          events.map((event) => (
-            <View key={event.key} style={styles.eventRow}>
-              {event.kind === 'shelf_add' && (
-                <Text style={styles.eventText}>
-                  <InlineLink href={`/profile/${event.actorId}`}>{event.actorName}</InlineLink>{' '}
-                  added "<InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
-                  to their shelf
-                </Text>
-              )}
-              {event.kind === 'new_friend' && (
-                <Text style={styles.eventText}>
-                  You and{' '}
-                  <InlineLink href={`/profile/${event.friendId}`}>{event.friendName}</InlineLink>{' '}
-                  are now friends
-                </Text>
-              )}
-              {event.kind === 'loan_active' && (
-                <View style={styles.loanRow}>
+          events.map((event) => {
+            const avatarUrl =
+              event.kind === 'shelf_add'
+                ? event.actorAvatarUrl
+                : event.kind === 'new_friend'
+                  ? event.friendAvatarUrl
+                  : event.counterpartAvatarUrl;
+            const avatarLabel =
+              event.kind === 'shelf_add'
+                ? event.actorName
+                : event.kind === 'new_friend'
+                  ? event.friendName
+                  : event.counterpartName;
+
+            return (
+              <View key={event.key} style={styles.row}>
+                <Avatar avatarUrl={avatarUrl} label={avatarLabel} size={40} />
+                <View style={styles.rowMiddle}>
                   <Text style={styles.eventText}>
-                    {event.role === 'lender' ? (
-                      <>
-                        You lent "
-                        <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
-                        to{' '}
-                        <InlineLink href={`/profile/${event.counterpartId}`}>
-                          {event.counterpartName}
-                        </InlineLink>
-                      </>
-                    ) : (
-                      <>
-                        <InlineLink href={`/profile/${event.counterpartId}`}>
-                          {event.counterpartName}
-                        </InlineLink>{' '}
-                        lent you "
-                        <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
-                      </>
-                    )}
+                    {event.kind === 'shelf_add' && (
+                        <>
+                          <InlineLink href={`/profile/${event.actorId}`}>
+                            {event.actorName}
+                          </InlineLink>{' '}
+                          added "
+                          <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>
+                          " to their shelf
+                        </>
+                      )}
+                      {event.kind === 'new_friend' && (
+                        <>
+                          You and{' '}
+                          <InlineLink href={`/profile/${event.friendId}`}>
+                            {event.friendName}
+                          </InlineLink>{' '}
+                          are now friends
+                        </>
+                      )}
+                      {event.kind === 'loan_active' &&
+                        (event.role === 'lender' ? (
+                          <>
+                            You lent "
+                            <InlineLink href={`/book/${event.bookId}`}>
+                              {event.bookTitle}
+                            </InlineLink>
+                            " to{' '}
+                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                              {event.counterpartName}
+                            </InlineLink>
+                          </>
+                        ) : (
+                          <>
+                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                              {event.counterpartName}
+                            </InlineLink>{' '}
+                            lent you "
+                            <InlineLink href={`/book/${event.bookId}`}>
+                              {event.bookTitle}
+                            </InlineLink>
+                            "
+                          </>
+                        ))}
+                      {event.kind === 'loan_returned' &&
+                        (event.role === 'lender' ? (
+                          <>
+                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                              {event.counterpartName}
+                            </InlineLink>{' '}
+                            returned "
+                            <InlineLink href={`/book/${event.bookId}`}>
+                              {event.bookTitle}
+                            </InlineLink>
+                            "
+                          </>
+                        ) : (
+                          <>
+                            You returned "
+                            <InlineLink href={`/book/${event.bookId}`}>
+                              {event.bookTitle}
+                            </InlineLink>
+                            " to{' '}
+                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                              {event.counterpartName}
+                            </InlineLink>
+                          </>
+                        ))}
                   </Text>
-                  {event.role === 'lender' && (
+                  <Text style={styles.timestamp}>{timeAgo(event.timestamp)}</Text>
+                  {event.kind === 'loan_active' && event.role === 'lender' && (
                     <Button
                       title="Mark returned"
                       variant="secondary"
                       onPress={() => markReturned(event.loanId)}
                       loading={returningId === event.loanId}
+                      style={styles.markReturnedButton}
                     />
                   )}
                 </View>
-              )}
-              {event.kind === 'loan_returned' && (
-                <Text style={styles.eventText}>
-                  {event.role === 'lender' ? (
-                    <>
-                      <InlineLink href={`/profile/${event.counterpartId}`}>
-                        {event.counterpartName}
-                      </InlineLink>{' '}
-                      returned "
-                      <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
-                    </>
-                  ) : (
-                    <>
-                      You returned "
-                      <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>" to{' '}
-                      <InlineLink href={`/profile/${event.counterpartId}`}>
-                        {event.counterpartName}
-                      </InlineLink>
-                    </>
-                  )}
-                </Text>
-              )}
-              <Text style={styles.timestamp}>{timeAgo(event.timestamp)}</Text>
-            </View>
-          ))
+                {(event.kind === 'shelf_add' ||
+                  event.kind === 'loan_active' ||
+                  event.kind === 'loan_returned') && (
+                  <CoverThumb url={event.bookCoverUrl} title={event.bookTitle} />
+                )}
+              </View>
+            );
+          })
         )}
       </View>
     </ScrollView>
@@ -403,13 +497,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  needsYouRow: {
-    paddingVertical: 10,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    gap: 6,
   },
-  needsYouText: {
+  rowMiddle: {
+    flex: 1,
+  },
+  eventText: {
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.text,
@@ -417,26 +516,36 @@ const styles = StyleSheet.create({
   needsYouActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 2,
+    marginTop: 8,
   },
-  eventRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 4,
-  },
-  eventText: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.text,
-  },
-  loanRow: {
-    gap: 8,
+  markReturnedButton: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   timestamp: {
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.textFaint,
+    marginTop: 3,
+  },
+  cover: {
+    width: 40,
+    height: 60,
+    backgroundColor: colors.chipBackground,
+  },
+  coverPlaceholder: {
+    width: 40,
+    height: 60,
+    backgroundColor: colors.chipBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 3,
+  },
+  coverPlaceholderText: {
+    fontFamily: fonts.semibold,
+    fontSize: 8,
+    color: colors.text,
+    textAlign: 'center',
   },
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
