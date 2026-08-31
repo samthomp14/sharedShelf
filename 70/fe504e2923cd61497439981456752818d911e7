@@ -1,0 +1,28 @@
+lib/time.ts
+  s_92d3aea12c5ddc::t_f03e8289461449 1-16
+components/InlineLink.tsx
+  s_92d3aea12c5ddc::t_7b44c60116a9ad 1-26
+app/(app)/index.tsx
+  s_92d3aea12c5ddc::t_456aea2218e354 2-3,6-7,12,14,19,42,52,81,87-89,109,157-158,170-171,182-183,245-274,276-277,281-284,286,316,319-321,326-328,336-341,345-349,367-371,375-379,384-385,410,420,426,436-439
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "70fe504e2923cd61497439981456752818d911e7",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_92d3aea12c5ddc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8d10346-c905-4551-bf43-46d19135b64c",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
