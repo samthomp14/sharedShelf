@@ -1,0 +1,24 @@
+supabase/seed.sql
+  s_92d3aea12c5ddc::t_ef95f1738ddc0a 64-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "bcca2ca545d71a30a0192d06eb0558267853a8ae",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_92d3aea12c5ddc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8d10346-c905-4551-bf43-46d19135b64c",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
