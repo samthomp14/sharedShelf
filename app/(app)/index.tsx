@@ -1,48 +1,64 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
-import { AuthorList } from '../../components/AuthorList';
-import { colors, fonts, inputStyle } from '../../lib/theme';
+import { colors, fonts } from '../../lib/theme';
 
-type ViewMode = 'covers' | 'list';
-
-interface ShelfItemRow {
+interface LoanRequestNeedsYou {
   id: string;
-  status: string;
-  sort_order: number;
-  book: { id: string; title: string; authors: string[]; cover_url: string | null } | null;
-}
-
-interface IncomingRequest {
-  id: string;
-  requester: { username: string; display_name: string | null } | null;
+  requester: { id: string; username: string; display_name: string | null } | null;
   shelf_item: { book: { title: string } | null } | null;
 }
 
-export default function MyShelf() {
+interface FriendRequestNeedsYou {
+  id: string;
+  requester: { id: string; username: string; display_name: string | null } | null;
+}
+
+type FeedEvent =
+  | {
+      key: string;
+      timestamp: string;
+      kind: 'shelf_add';
+      actorId: string;
+      actorName: string;
+      bookId: string;
+      bookTitle: string;
+    }
+  | { key: string; timestamp: string; kind: 'new_friend'; friendId: string; friendName: string }
+  | {
+      key: string;
+      timestamp: string;
+      kind: 'loan_active';
+      role: 'lender' | 'borrower';
+      loanId: string;
+      counterpartId: string;
+      counterpartName: string;
+      bookTitle: string;
+    }
+  | {
+      key: string;
+      timestamp: string;
+      kind: 'loan_returned';
+      role: 'lender' | 'borrower';
+      counterpartId: string;
+      counterpartName: string;
+      bookTitle: string;
+    };
+
+function personName(p: { username: string; display_name: string | null } | null | undefined) {
+  return p?.display_name ?? p?.username ?? 'Someone';
+}
+
+export default function Activity() {
   const router = useRouter();
-  const [items, setItems] = useState<ShelfItemRow[]>([]);
-  const [requests, setRequests] = useState<IncomingRequest[]>([]);
+  const [loanRequests, setLoanRequests] = useState<LoanRequestNeedsYou[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequestNeedsYou[]>([]);
+  const [events, setEvents] = useState<FeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-
-  const filteredItems = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
-      const title = item.book?.title?.toLowerCase() ?? '';
-      const authors = item.book?.authors?.join(' ').toLowerCase() ?? '';
-      return title.includes(q) || authors.includes(q);
-    });
-  }, [items, query]);
-
-  const canReorder = viewMode === 'list' && !query.trim();
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [returningId, setReturningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,28 +69,115 @@ export default function MyShelf() {
       return;
     }
 
-    const [shelfResult, requestsResult] = await Promise.all([
-      supabase
-        .from('shelf_items')
-        .select('id, status, sort_order, book:books(id, title, authors, cover_url)')
-        .eq('owner_id', uid)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false }),
+    const [loanReqRes, friendReqRes, shelfAddRes, friendshipsRes, loansRes] = await Promise.all([
       supabase
         .from('loan_requests')
         .select(
-          'id, requester:profiles(username, display_name), shelf_item:shelf_items!inner(id, owner_id, book:books(title))'
+          'id, requester:profiles(id, username, display_name), shelf_item:shelf_items!inner(id, owner_id, book:books(title))'
         )
         .eq('status', 'pending')
         .eq('shelf_item.owner_id', uid),
+      supabase
+        .from('friendships')
+        .select('id, requester:profiles!friendships_requester_id_fkey(id, username, display_name)')
+        .eq('status', 'pending')
+        .eq('addressee_id', uid),
+      supabase
+        .from('shelf_items')
+        .select('id, created_at, owner:profiles(id, username, display_name), book:books(id, title)')
+        .neq('owner_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(30),
+      supabase
+        .from('friendships')
+        .select(
+          'id, requester_id, addressee_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name)'
+        )
+        .eq('status', 'accepted')
+        .order('responded_at', { ascending: false })
+        .limit(30),
+      supabase
+        .from('loans')
+        .select(
+          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(title)), lender:profiles!loans_lender_id_fkey(id, username, display_name), borrower:profiles!loans_borrower_id_fkey(id, username, display_name)'
+        )
+        .or(`lender_id.eq.${uid},borrower_id.eq.${uid}`)
+        .order('started_at', { ascending: false })
+        .limit(30),
     ]);
 
-    if (!shelfResult.error && shelfResult.data) {
-      setItems(shelfResult.data as unknown as ShelfItemRow[]);
+    if (!loanReqRes.error && loanReqRes.data) {
+      setLoanRequests(loanReqRes.data as unknown as LoanRequestNeedsYou[]);
     }
-    if (!requestsResult.error && requestsResult.data) {
-      setRequests(requestsResult.data as unknown as IncomingRequest[]);
+    if (!friendReqRes.error && friendReqRes.data) {
+      setFriendRequests(friendReqRes.data as unknown as FriendRequestNeedsYou[]);
     }
+
+    const merged: FeedEvent[] = [];
+
+    if (!shelfAddRes.error && shelfAddRes.data) {
+      for (const row of shelfAddRes.data as any[]) {
+        if (!row.book || !row.owner) continue;
+        merged.push({
+          key: `shelf-${row.id}`,
+          timestamp: row.created_at,
+          kind: 'shelf_add',
+          actorId: row.owner.id,
+          actorName: personName(row.owner),
+          bookId: row.book.id,
+          bookTitle: row.book.title,
+        });
+      }
+    }
+
+    if (!friendshipsRes.error && friendshipsRes.data) {
+      for (const row of friendshipsRes.data as any[]) {
+        const isRequester = row.requester_id === uid;
+        const friend = isRequester ? row.addressee : row.requester;
+        if (!friend) continue;
+        merged.push({
+          key: `friend-${row.id}`,
+          timestamp: row.responded_at ?? row.created_at,
+          kind: 'new_friend',
+          friendId: friend.id,
+          friendName: personName(friend),
+        });
+      }
+    }
+
+    if (!loansRes.error && loansRes.data) {
+      for (const row of loansRes.data as any[]) {
+        const bookTitle = row.shelf_item?.book?.title ?? 'a book';
+        const role: 'lender' | 'borrower' = row.lender_id === uid ? 'lender' : 'borrower';
+        const counterpart = role === 'lender' ? row.borrower : row.lender;
+        if (!counterpart) continue;
+        if (row.returned_at) {
+          merged.push({
+            key: `loan-${row.id}-returned`,
+            timestamp: row.returned_at,
+            kind: 'loan_returned',
+            role,
+            counterpartId: counterpart.id,
+            counterpartName: personName(counterpart),
+            bookTitle,
+          });
+        } else {
+          merged.push({
+            key: `loan-${row.id}-active`,
+            timestamp: row.started_at,
+            kind: 'loan_active',
+            role,
+            loanId: row.id,
+            counterpartId: counterpart.id,
+            counterpartName: personName(counterpart),
+            bookTitle,
+          });
+        }
+      }
+    }
+
+    merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setEvents(merged.slice(0, 40));
     setLoading(false);
   }, []);
 
@@ -84,260 +187,180 @@ export default function MyShelf() {
     }, [load])
   );
 
-  async function respond(requestId: string, status: 'accepted' | 'declined') {
-    setRespondingId(requestId);
+  async function respondLoanRequest(requestId: string, status: 'accepted' | 'declined') {
+    setActingId(requestId);
     const { error } = await supabase
       .from('loan_requests')
       .update({ status, responded_at: new Date().toISOString() })
       .eq('id', requestId);
-    setRespondingId(null);
-    if (!error) {
-      load();
-    }
+    setActingId(null);
+    if (!error) load();
   }
 
-  async function markReturned(shelfItemId: string) {
-    const { data: loan } = await supabase
-      .from('loans')
-      .select('id')
-      .eq('shelf_item_id', shelfItemId)
-      .is('returned_at', null)
-      .maybeSingle();
-
-    if (loan) {
+  async function respondFriendRequest(requestId: string, action: 'accept' | 'decline') {
+    setActingId(requestId);
+    if (action === 'accept') {
       await supabase
-        .from('loans')
-        .update({ returned_at: new Date().toISOString() })
-        .eq('id', loan.id);
-      load();
+        .from('friendships')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('id', requestId);
+    } else {
+      await supabase.from('friendships').delete().eq('id', requestId);
     }
+    setActingId(null);
+    load();
   }
 
-  function handleDragEnd(data: ShelfItemRow[]) {
-    const reordered = data.map((item, index) => ({ ...item, sort_order: index }));
-    setItems(reordered);
-    Promise.all(
-      reordered.map((item) =>
-        supabase.from('shelf_items').update({ sort_order: item.sort_order }).eq('id', item.id)
-      )
-    );
+  async function markReturned(loanId: string) {
+    setReturningId(loanId);
+    await supabase
+      .from('loans')
+      .update({ returned_at: new Date().toISOString() })
+      .eq('id', loanId);
+    setReturningId(null);
+    load();
   }
 
-  function renderCard(item: ShelfItemRow, drag?: () => void, isActive?: boolean) {
-    return viewMode === 'covers' ? (
-      <Pressable
-        style={[styles.coverCard, isActive && styles.activeRow]}
-        onPress={() => item.book && router.push(`/book/${item.book.id}`)}
-      >
-        {item.book?.cover_url ? (
-          <Image source={{ uri: item.book.cover_url }} style={styles.coverImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.spinePlaceholder}>
-            <Text style={styles.spineTitle} numberOfLines={5}>
-              {item.book?.title ?? 'Unknown title'}
-            </Text>
-          </View>
-        )}
-        <Text style={styles.coverCardTitle} numberOfLines={2}>
-          {item.book?.title ?? 'Unknown title'}
-        </Text>
-        {item.status !== 'available' && <Chip label={item.status.replace('_', ' ')} />}
-      </Pressable>
-    ) : (
-      <Pressable
-        style={[styles.row, isActive && styles.activeRow]}
-        onLongPress={drag}
-        disabled={isActive}
-      >
-        <View style={{ flex: 1 }}>
-          <Pressable onPress={() => item.book && router.push(`/book/${item.book.id}`)}>
-            <Text style={styles.bookTitle}>{item.book?.title ?? 'Unknown title'}</Text>
-          </Pressable>
-          <AuthorList authors={item.book?.authors ?? []} textStyle={styles.bookAuthor} />
-        </View>
-        {item.status === 'on_loan' ? (
-          <Button title="Mark returned" variant="secondary" onPress={() => markReturned(item.id)} />
-        ) : (
-          <Chip label={item.status.replace('_', ' ')} />
-        )}
-      </Pressable>
-    );
-  }
+  const hasNeedsYou = loanRequests.length > 0 || friendRequests.length > 0;
 
-  const listHeader = (
-    <View>
-      {items.length > 0 && (
-        <View style={styles.viewToggle}>
-          <Pressable
-            style={[styles.toggleButton, viewMode === 'covers' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('covers')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'covers' && styles.toggleTextActive]}>
-              Covers
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
-              List
-            </Text>
-          </Pressable>
-        </View>
-      )}
-
-      {items.length > 0 && (
-        <TextInput
-          style={[inputStyle, styles.searchInput]}
-          placeholder="Search your shelf by title or author"
-          placeholderTextColor={colors.textFaint}
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-        />
-      )}
-
-      {requests.length > 0 && (
-        <View style={styles.requestsSection}>
-          <Text style={styles.sectionTitle}>Requests</Text>
-          {requests.map((req) => (
-            <View key={req.id} style={styles.requestRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.bookTitle}>{req.shelf_item?.book?.title ?? 'Unknown title'}</Text>
-                <Text style={styles.bookAuthor}>
-                  {req.requester?.display_name ?? req.requester?.username} wants to borrow this
-                </Text>
-              </View>
-              <View style={styles.requestActions}>
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+    >
+      {hasNeedsYou && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Needs you</Text>
+          {loanRequests.map((req) => (
+            <View key={req.id} style={styles.needsYouRow}>
+              <Text style={styles.needsYouText}>
+                <Text style={styles.bold}>{personName(req.requester)}</Text> wants to borrow "
+                {req.shelf_item?.book?.title ?? 'a book'}"
+              </Text>
+              <View style={styles.needsYouActions}>
                 <Button
                   title="Decline"
                   variant="secondary"
-                  onPress={() => respond(req.id, 'declined')}
-                  loading={respondingId === req.id}
+                  onPress={() => respondLoanRequest(req.id, 'declined')}
+                  loading={actingId === req.id}
                 />
                 <Button
                   title="Accept"
-                  onPress={() => respond(req.id, 'accepted')}
-                  loading={respondingId === req.id}
+                  onPress={() => respondLoanRequest(req.id, 'accepted')}
+                  loading={actingId === req.id}
+                />
+              </View>
+            </View>
+          ))}
+          {friendRequests.map((req) => (
+            <View key={req.id} style={styles.needsYouRow}>
+              <Text style={styles.needsYouText}>
+                <Text style={styles.bold}>{personName(req.requester)}</Text> sent you a friend
+                request
+              </Text>
+              <View style={styles.needsYouActions}>
+                <Button
+                  title="Decline"
+                  variant="secondary"
+                  onPress={() => respondFriendRequest(req.id, 'decline')}
+                  loading={actingId === req.id}
+                />
+                <Button
+                  title="Accept"
+                  onPress={() => respondFriendRequest(req.id, 'accept')}
+                  loading={actingId === req.id}
                 />
               </View>
             </View>
           ))}
         </View>
       )}
-    </View>
-  );
 
-  const emptyComponent = !loading ? (
-    <View style={styles.empty}>
-      {items.length === 0 ? (
-        <>
-          <Text style={styles.emptyTitle}>Your shelf is empty</Text>
-          <Text style={styles.emptyBody}>Add the physical books you own to get started.</Text>
-        </>
-      ) : (
-        <Text style={styles.emptyBody}>No books match "{query}".</Text>
-      )}
-    </View>
-  ) : null;
-
-  return (
-    <View style={styles.container}>
-      {canReorder ? (
-        <DraggableFlatList
-          key={viewMode}
-          data={filteredItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={emptyComponent}
-          onDragEnd={({ data }) => handleDragEnd(data)}
-          renderItem={({ item, drag, isActive }: RenderItemParams<ShelfItemRow>) =>
-            renderCard(item, drag, isActive)
-          }
-        />
-      ) : (
-        <FlatList
-          key={viewMode}
-          data={filteredItems}
-          keyExtractor={(item) => item.id}
-          numColumns={viewMode === 'covers' ? 3 : 1}
-          columnWrapperStyle={viewMode === 'covers' ? styles.gridRow : undefined}
-          contentContainerStyle={styles.list}
-          refreshing={loading}
-          onRefresh={load}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={emptyComponent}
-          renderItem={({ item }) => renderCard(item)}
-        />
-      )}
-    </View>
+      <View style={styles.section}>
+        {events.length > 0 && <Text style={styles.sectionTitle}>Recent</Text>}
+        {events.length === 0 && !loading ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Nothing here yet</Text>
+            <Text style={styles.emptyBody}>
+              Add friends and books to start seeing activity.
+            </Text>
+          </View>
+        ) : (
+          events.map((event) => (
+            <Pressable
+              key={event.key}
+              style={styles.eventRow}
+              onPress={() => {
+                if (event.kind === 'shelf_add') router.push(`/book/${event.bookId}`);
+                else if (event.kind === 'new_friend') router.push(`/profile/${event.friendId}`);
+                else router.push(`/profile/${event.counterpartId}`);
+              }}
+            >
+              {event.kind === 'shelf_add' && (
+                <Text style={styles.eventText}>
+                  <Text style={styles.bold}>{event.actorName}</Text> added "{event.bookTitle}" to
+                  their shelf
+                </Text>
+              )}
+              {event.kind === 'new_friend' && (
+                <Text style={styles.eventText}>
+                  You and <Text style={styles.bold}>{event.friendName}</Text> are now friends
+                </Text>
+              )}
+              {event.kind === 'loan_active' && (
+                <View style={styles.loanRow}>
+                  <Text style={styles.eventText}>
+                    {event.role === 'lender' ? (
+                      <>
+                        You lent "{event.bookTitle}" to{' '}
+                        <Text style={styles.bold}>{event.counterpartName}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.bold}>{event.counterpartName}</Text> lent you "
+                        {event.bookTitle}"
+                      </>
+                    )}
+                  </Text>
+                  {event.role === 'lender' && (
+                    <Button
+                      title="Mark returned"
+                      variant="secondary"
+                      onPress={() => markReturned(event.loanId)}
+                      loading={returningId === event.loanId}
+                    />
+                  )}
+                </View>
+              )}
+              {event.kind === 'loan_returned' && (
+                <Text style={styles.eventText}>
+                  {event.role === 'lender' ? (
+                    <>
+                      <Text style={styles.bold}>{event.counterpartName}</Text> returned "
+                      {event.bookTitle}"
+                    </>
+                  ) : (
+                    <>
+                      You returned "{event.bookTitle}" to{' '}
+                      <Text style={styles.bold}>{event.counterpartName}</Text>
+                    </>
+                  )}
+                </Text>
+              )}
+            </Pressable>
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  list: { padding: 16, flexGrow: 1 },
-  viewToggle: {
-    flexDirection: 'row',
+  content: { padding: 16, flexGrow: 1 },
+  section: {
     marginBottom: 16,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
-  },
-  toggleText: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  toggleTextActive: {
-    color: colors.background,
-  },
-  searchInput: {
-    marginBottom: 16,
-  },
-  gridRow: {
-    justifyContent: 'flex-start',
-    gap: 12,
-  },
-  coverCard: {
-    width: '31%',
-    marginBottom: 20,
-  },
-  coverImage: {
-    width: '100%',
-    aspectRatio: 2 / 3,
-    backgroundColor: colors.chipBackground,
-    marginBottom: 6,
-  },
-  spinePlaceholder: {
-    width: '100%',
-    aspectRatio: 2 / 3,
-    backgroundColor: colors.chipBackground,
-    marginBottom: 6,
-    padding: 8,
-    justifyContent: 'center',
-  },
-  spineTitle: {
-    fontFamily: fonts.semibold,
-    fontSize: 12,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  coverCardTitle: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    color: colors.text,
-    marginBottom: 4,
   },
   sectionTitle: {
     fontFamily: fonts.semibold,
@@ -345,38 +368,40 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
     marginBottom: 8,
-    marginTop: 8,
   },
-  requestsSection: {
-    marginBottom: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  requestRow: {
+  needsYouRow: {
     paddingVertical: 10,
-    gap: 8,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.background,
+    gap: 8,
   },
-  activeRow: {
-    backgroundColor: colors.chipBackground,
+  needsYouText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.text,
   },
-  bookTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
-  bookAuthor: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
+  needsYouActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  eventRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  eventText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.text,
+  },
+  loanRow: {
+    gap: 8,
+  },
+  bold: {
+    fontFamily: fonts.semibold,
+    color: colors.text,
+  },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
   emptyBody: {
     fontFamily: fonts.regular,

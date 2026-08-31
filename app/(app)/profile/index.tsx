@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { Avatar } from '../../../components/Avatar';
+import { Button } from '../../../components/Button';
 import { ShelfGrid } from '../../../components/ShelfGrid';
 import { colors, fonts } from '../../../lib/theme';
 
@@ -72,18 +73,30 @@ export default function Profile() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Avatar avatarUrl={profile.avatar_url} label={name} size={88} />
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.username}>@{profile.username}</Text>
-        {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-        <Text style={styles.friendCount}>
-          {friendCount} {friendCount === 1 ? 'friend' : 'friends'}
-        </Text>
-        <Pressable onPress={() => router.push('/profile/settings')}>
-          <Text style={styles.editLink}>Edit profile</Text>
-        </Pressable>
+      <View style={styles.topRow}>
+        <Avatar avatarUrl={profile.avatar_url} label={name} size={80} />
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>{items.length}</Text>
+            <Text style={styles.statLabel}>{items.length === 1 ? 'book' : 'books'}</Text>
+          </View>
+          <Pressable style={styles.stat} onPress={() => router.push('/profile/friends')}>
+            <Text style={styles.statNumber}>{friendCount}</Text>
+            <Text style={styles.statLabel}>{friendCount === 1 ? 'friend' : 'friends'}</Text>
+          </Pressable>
+        </View>
       </View>
+
+      <Text style={styles.name}>{name}</Text>
+      <Text style={styles.username}>@{profile.username}</Text>
+      {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+
+      <Button
+        title="Edit profile"
+        variant="secondary"
+        onPress={() => router.push('/profile/settings')}
+        style={styles.editButton}
+      />
 
       <ShelfGrid items={items} emptyText="Your shelf is empty. Add a book to get started." />
     </ScrollView>
@@ -93,12 +106,35 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, flexGrow: 1 },
-  header: { alignItems: 'center', paddingTop: 8, paddingBottom: 28 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+    marginBottom: 16,
+  },
+  stats: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontFamily: fonts.semibold,
+    fontSize: 18,
+    color: colors.text,
+  },
+  statLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   name: {
     fontFamily: fonts.semibold,
-    fontSize: 20,
+    fontSize: 17,
     color: colors.text,
-    marginTop: 16,
   },
   username: {
     fontFamily: fonts.regular,
@@ -110,21 +146,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.text,
-    textAlign: 'center',
-    marginTop: 12,
-    paddingHorizontal: 16,
+    marginTop: 8,
   },
-  friendCount: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    color: colors.textMuted,
-    marginTop: 12,
-  },
-  editLink: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    color: colors.textMuted,
-    textDecorationLine: 'underline',
-    marginTop: 10,
+  editButton: {
+    marginTop: 16,
+    marginBottom: 24,
   },
 });

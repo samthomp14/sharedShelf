@@ -132,20 +132,31 @@ export default function UserProfile() {
   }
 
   const name = profile.display_name ?? profile.username;
+  const isFriends = status === 'friends';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Avatar avatarUrl={profile.avatar_url} label={name} size={88} />
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.username}>@{profile.username}</Text>
-        {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-        <Text style={styles.friendCount}>
-          {friendCount} {friendCount === 1 ? 'friend' : 'friends'}
-        </Text>
+      <View style={styles.topRow}>
+        <Avatar avatarUrl={profile.avatar_url} label={name} size={80} />
+        <View style={styles.stats}>
+          {isFriends && (
+            <View style={styles.stat}>
+              <Text style={styles.statNumber}>{items.length}</Text>
+              <Text style={styles.statLabel}>{items.length === 1 ? 'book' : 'books'}</Text>
+            </View>
+          )}
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>{friendCount}</Text>
+            <Text style={styles.statLabel}>{friendCount === 1 ? 'friend' : 'friends'}</Text>
+          </View>
+        </View>
       </View>
 
-      {status !== 'friends' && (
+      <Text style={styles.name}>{name}</Text>
+      <Text style={styles.username}>@{profile.username}</Text>
+      {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+
+      {!isFriends && (
         <View style={styles.actions}>
           {status === 'none' && <Button title="Add friend" onPress={sendRequest} loading={acting} />}
           {status === 'pending_sent' && <Button title="Request sent" variant="secondary" disabled />}
@@ -164,7 +175,11 @@ export default function UserProfile() {
         </View>
       )}
 
-      {status === 'friends' && <ShelfGrid items={items} emptyText="This shelf is empty so far." />}
+      {isFriends && (
+        <View style={styles.grid}>
+          <ShelfGrid items={items} emptyText="This shelf is empty so far." />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -172,12 +187,35 @@ export default function UserProfile() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, flexGrow: 1 },
-  header: { alignItems: 'center', paddingTop: 8, paddingBottom: 28 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+    marginBottom: 16,
+  },
+  stats: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontFamily: fonts.semibold,
+    fontSize: 18,
+    color: colors.text,
+  },
+  statLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   name: {
     fontFamily: fonts.semibold,
-    fontSize: 20,
+    fontSize: 17,
     color: colors.text,
-    marginTop: 16,
   },
   username: {
     fontFamily: fonts.regular,
@@ -189,19 +227,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.text,
-    textAlign: 'center',
-    marginTop: 12,
-    paddingHorizontal: 16,
-  },
-  friendCount: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    color: colors.textMuted,
-    marginTop: 12,
+    marginTop: 8,
   },
   actions: {
     gap: 10,
-    marginBottom: 24,
+    marginTop: 16,
+  },
+  grid: {
+    marginTop: 20,
   },
   hint: {
     fontFamily: fonts.regular,

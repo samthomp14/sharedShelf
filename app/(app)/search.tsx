@@ -1,0 +1,265 @@
+import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { supabase } from '../../lib/supabase';
+import { Button } from '../../components/Button';
+import { colors, fonts, inputStyle } from '../../lib/theme';
+
+interface PersonResult {
+  id: string;
+  username: string;
+  display_name: string | null;
+}
+
+interface BookResult {
+  id: string;
+  title: string;
+  authors: string[];
+  cover_url: string | null;
+}
+
+export default function Search() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [people, setPeople] = useState<PersonResult[]>([]);
+  const [books, setBooks] = useState<BookResult[]>([]);
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  async function search() {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearched(true);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+
+    const [peopleRes, booksRes, allBooksRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, display_name')
+        .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+        .neq('id', uid ?? '')
+        .limit(15),
+      supabase.from('books').select('id, title, authors, cover_url').ilike('title', `%${q}%`).limit(15),
+      supabase.from('books').select('authors').limit(500),
+    ]);
+
+    setPeople(peopleRes.data ?? []);
+    setBooks(booksRes.data ?? []);
+
+    const lowerQ = q.toLowerCase();
+    const matchedAuthors = new Set<string>();
+    for (const row of allBooksRes.data ?? []) {
+      for (const author of row.authors ?? []) {
+        if (author.toLowerCase().includes(lowerQ)) matchedAuthors.add(author);
+      }
+    }
+    setAuthors(Array.from(matchedAuthors).slice(0, 15));
+
+    setSearching(false);
+  }
+
+  async function sendRequest(target: PersonResult) {
+    setSendingId(target.id);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) {
+      setSendingId(null);
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from('friendships')
+      .select('id, requester_id, status')
+      .or(
+        `and(requester_id.eq.${uid},addressee_id.eq.${target.id}),and(requester_id.eq.${target.id},addressee_id.eq.${uid})`
+      )
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.status === 'accepted') {
+        Alert.alert('Already friends', `You and @${target.username} are already connected.`);
+      } else if (existing.requester_id === uid) {
+        Alert.alert('Request already sent');
+      } else {
+        const { error } = await supabase
+          .from('friendships')
+          .update({ status: 'accepted', responded_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        if (error) {
+          Alert.alert('Could not accept request', error.message);
+        } else {
+          Alert.alert('You are now friends!', `@${target.username} had already requested you.`);
+        }
+      }
+      setSendingId(null);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('friendships')
+      .insert({ requester_id: uid, addressee_id: target.id });
+
+    setSendingId(null);
+
+    if (error) {
+      Alert.alert('Could not send request', error.message);
+    } else {
+      Alert.alert('Request sent', `@${target.username} will see your request.`);
+    }
+  }
+
+  const hasResults = people.length > 0 || books.length > 0 || authors.length > 0;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.searchRow}>
+        <TextInput
+          style={[inputStyle, styles.searchInput]}
+          placeholder="Search people, books, and authors"
+          placeholderTextColor={colors.textFaint}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          onSubmitEditing={search}
+          returnKeyType="search"
+        />
+        <Button title="Search" variant="secondary" onPress={search} loading={searching} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.results}>
+        {!searched && (
+          <Text style={styles.emptyText}>
+            Search for a username, book title, or author.
+          </Text>
+        )}
+        {searched && !searching && !hasResults && (
+          <Text style={styles.emptyText}>No matches for "{query}".</Text>
+        )}
+
+        {people.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>People</Text>
+            {people.map((item) => (
+              <View key={item.id} style={styles.row}>
+                <Pressable style={{ flex: 1 }} onPress={() => router.push(`/profile/${item.id}`)}>
+                  <Text style={styles.name}>{item.display_name ?? item.username}</Text>
+                  <Text style={styles.subtext}>@{item.username}</Text>
+                </Pressable>
+                <Button
+                  title="Add"
+                  variant="secondary"
+                  onPress={() => sendRequest(item)}
+                  loading={sendingId === item.id}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {books.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Books</Text>
+            {books.map((item) => (
+              <Pressable key={item.id} style={styles.bookRow} onPress={() => router.push(`/book/${item.id}`)}>
+                {item.cover_url ? (
+                  <Image source={{ uri: item.cover_url }} style={styles.bookCover} resizeMode="cover" />
+                ) : (
+                  <View style={styles.bookSpine}>
+                    <Text style={styles.bookSpineText} numberOfLines={3}>
+                      {item.title}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{item.title}</Text>
+                  <Text style={styles.subtext}>{item.authors.join(', ')}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {authors.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Authors</Text>
+            {authors.map((author) => (
+              <Pressable
+                key={author}
+                style={styles.row}
+                onPress={() => router.push(`/author/${encodeURIComponent(author)}`)}
+              >
+                <Text style={styles.name}>{author}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, padding: 16 },
+  searchRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  searchInput: { flex: 1, marginBottom: 0 },
+  results: { paddingTop: 16, flexGrow: 1 },
+  section: { marginBottom: 20 },
+  sectionTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  bookRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  bookCover: {
+    width: 44,
+    height: 66,
+    backgroundColor: colors.chipBackground,
+  },
+  bookSpine: {
+    width: 44,
+    height: 66,
+    backgroundColor: colors.chipBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  bookSpineText: {
+    fontFamily: fonts.semibold,
+    fontSize: 9,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  name: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  subtext: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
+  emptyText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 40,
+  },
+});

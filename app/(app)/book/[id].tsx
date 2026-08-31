@@ -28,6 +28,7 @@ export default function BookDetail() {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [requestingId, setRequestingId] = useState<string | null>(null);
+  const [returningId, setReturningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -75,6 +76,25 @@ export default function BookDetail() {
     }
   }
 
+  async function markReturned(shelfItemId: string) {
+    setReturningId(shelfItemId);
+    const { data: loan } = await supabase
+      .from('loans')
+      .select('id')
+      .eq('shelf_item_id', shelfItemId)
+      .is('returned_at', null)
+      .maybeSingle();
+
+    if (loan) {
+      await supabase
+        .from('loans')
+        .update({ returned_at: new Date().toISOString() })
+        .eq('id', loan.id);
+      load();
+    }
+    setReturningId(null);
+  }
+
   if (loading && !book) {
     return <View style={styles.container} />;
   }
@@ -118,14 +138,23 @@ export default function BookDetail() {
                   {isMine ? 'You' : copy.owner?.display_name ?? copy.owner?.username}
                 </Text>
               </View>
-              {!isMine && copy.status === 'available' ? (
+              {!isMine && copy.status === 'available' && (
                 <Button
                   title="Ask to borrow"
                   variant="secondary"
                   onPress={() => requestToBorrow(copy.id)}
                   loading={requestingId === copy.id}
                 />
-              ) : (
+              )}
+              {isMine && copy.status === 'on_loan' && (
+                <Button
+                  title="Mark returned"
+                  variant="secondary"
+                  onPress={() => markReturned(copy.id)}
+                  loading={returningId === copy.id}
+                />
+              )}
+              {(isMine ? copy.status !== 'on_loan' : copy.status !== 'available') && (
                 <Chip label={copy.status.replace('_', ' ')} />
               )}
             </View>

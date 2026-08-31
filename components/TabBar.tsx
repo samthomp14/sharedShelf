@@ -83,7 +83,13 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         {visibleRoutes.map((route) => {
           const { options } = descriptors[route.key];
           const label = typeof options.title === 'string' ? options.title : route.name;
-          const focused = route.key === highlightKey;
+          const highlighted = route.key === highlightKey;
+          // Distinct from `highlighted`: this is whether the route is the
+          // *actual* active route (not just which tab the indicator is
+          // pinned to) — pressing a tab must still navigate even when it's
+          // already highlighted because you're on one of its hidden/detail
+          // screens (e.g. pressing "Activity" while on /book/[id]).
+          const isCurrentRoute = route.key === activeRoute.key;
 
           return (
             <Pressable
@@ -94,7 +100,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   target: route.key,
                   canPreventDefault: true,
                 });
-                if (!focused && !event.defaultPrevented) {
+                if (!isCurrentRoute && !event.defaultPrevented) {
                   navigation.navigate(route.name);
                 }
               }}
@@ -104,7 +110,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               }}
               style={styles.tab}
             >
-              <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
+              <Text style={[styles.label, highlighted && styles.labelActive]}>{label}</Text>
             </Pressable>
           );
         })}
