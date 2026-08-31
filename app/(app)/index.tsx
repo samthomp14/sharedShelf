@@ -1,18 +1,22 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
+import { InlineLink } from '../../components/InlineLink';
+import { timeAgo } from '../../lib/time';
 import { colors, fonts } from '../../lib/theme';
 
 interface LoanRequestNeedsYou {
   id: string;
+  created_at: string;
   requester: { id: string; username: string; display_name: string | null } | null;
-  shelf_item: { book: { title: string } | null } | null;
+  shelf_item: { book: { id: string; title: string } | null } | null;
 }
 
 interface FriendRequestNeedsYou {
   id: string;
+  created_at: string;
   requester: { id: string; username: string; display_name: string | null } | null;
 }
 
@@ -35,6 +39,7 @@ type FeedEvent =
       loanId: string;
       counterpartId: string;
       counterpartName: string;
+      bookId: string;
       bookTitle: string;
     }
   | {
@@ -44,6 +49,7 @@ type FeedEvent =
       role: 'lender' | 'borrower';
       counterpartId: string;
       counterpartName: string;
+      bookId: string;
       bookTitle: string;
     };
 
@@ -52,7 +58,6 @@ function personName(p: { username: string; display_name: string | null } | null 
 }
 
 export default function Activity() {
-  const router = useRouter();
   const [loanRequests, setLoanRequests] = useState<LoanRequestNeedsYou[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequestNeedsYou[]>([]);
   const [events, setEvents] = useState<FeedEvent[]>([]);
@@ -73,13 +78,15 @@ export default function Activity() {
       supabase
         .from('loan_requests')
         .select(
-          'id, requester:profiles(id, username, display_name), shelf_item:shelf_items!inner(id, owner_id, book:books(title))'
+          'id, created_at, requester:profiles(id, username, display_name), shelf_item:shelf_items!inner(id, owner_id, book:books(id, title))'
         )
         .eq('status', 'pending')
         .eq('shelf_item.owner_id', uid),
       supabase
         .from('friendships')
-        .select('id, requester:profiles!friendships_requester_id_fkey(id, username, display_name)')
+        .select(
+          'id, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name)'
+        )
         .eq('status', 'pending')
         .eq('addressee_id', uid),
       supabase
@@ -99,7 +106,7 @@ export default function Activity() {
       supabase
         .from('loans')
         .select(
-          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(title)), lender:profiles!loans_lender_id_fkey(id, username, display_name), borrower:profiles!loans_borrower_id_fkey(id, username, display_name)'
+          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(id, title)), lender:profiles!loans_lender_id_fkey(id, username, display_name), borrower:profiles!loans_borrower_id_fkey(id, username, display_name)'
         )
         .or(`lender_id.eq.${uid},borrower_id.eq.${uid}`)
         .order('started_at', { ascending: false })
@@ -147,7 +154,8 @@ export default function Activity() {
 
     if (!loansRes.error && loansRes.data) {
       for (const row of loansRes.data as any[]) {
-        const bookTitle = row.shelf_item?.book?.title ?? 'a book';
+        const book = row.shelf_item?.book;
+        if (!book) continue;
         const role: 'lender' | 'borrower' = row.lender_id === uid ? 'lender' : 'borrower';
         const counterpart = role === 'lender' ? row.borrower : row.lender;
         if (!counterpart) continue;
@@ -159,7 +167,8 @@ export default function Activity() {
             role,
             counterpartId: counterpart.id,
             counterpartName: personName(counterpart),
-            bookTitle,
+            bookId: book.id,
+            bookTitle: book.title,
           });
         } else {
           merged.push({
@@ -170,7 +179,8 @@ export default function Activity() {
             loanId: row.id,
             counterpartId: counterpart.id,
             counterpartName: personName(counterpart),
-            bookTitle,
+            bookId: book.id,
+            bookTitle: book.title,
           });
         }
       }
@@ -232,33 +242,48 @@ export default function Activity() {
       {hasNeedsYou && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Needs you</Text>
-          {loanRequests.map((req) => (
-            <View key={req.id} style={styles.needsYouRow}>
-              <Text style={styles.needsYouText}>
-                <Text style={styles.bold}>{personName(req.requester)}</Text> wants to borrow "
-                {req.shelf_item?.book?.title ?? 'a book'}"
-              </Text>
-              <View style={styles.needsYouActions}>
-                <Button
-                  title="Decline"
-                  variant="secondary"
-                  onPress={() => respondLoanRequest(req.id, 'declined')}
-                  loading={actingId === req.id}
-                />
-                <Button
-                  title="Accept"
-                  onPress={() => respondLoanRequest(req.id, 'accepted')}
-                  loading={actingId === req.id}
-                />
+          {loanRequests.map((req) => {
+            const book = req.shelf_item?.book;
+            return (
+              <View key={req.id} style={styles.needsYouRow}>
+                <Text style={styles.needsYouText}>
+                  <InlineLink href={`/profile/${req.requester?.id}`}>
+                    {personName(req.requester)}
+                  </InlineLink>{' '}
+                  wants to borrow "
+                  {book ? (
+                    <InlineLink href={`/book/${book.id}`}>{book.title}</InlineLink>
+                  ) : (
+                    'a book'
+                  )}
+                  "
+                </Text>
+                <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
+                <View style={styles.needsYouActions}>
+                  <Button
+                    title="Decline"
+                    variant="secondary"
+                    onPress={() => respondLoanRequest(req.id, 'declined')}
+                    loading={actingId === req.id}
+                  />
+                  <Button
+                    title="Accept"
+                    onPress={() => respondLoanRequest(req.id, 'accepted')}
+                    loading={actingId === req.id}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
           {friendRequests.map((req) => (
             <View key={req.id} style={styles.needsYouRow}>
               <Text style={styles.needsYouText}>
-                <Text style={styles.bold}>{personName(req.requester)}</Text> sent you a friend
-                request
+                <InlineLink href={`/profile/${req.requester?.id}`}>
+                  {personName(req.requester)}
+                </InlineLink>{' '}
+                sent you a friend request
               </Text>
+              <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
               <View style={styles.needsYouActions}>
                 <Button
                   title="Decline"
@@ -288,24 +313,19 @@ export default function Activity() {
           </View>
         ) : (
           events.map((event) => (
-            <Pressable
-              key={event.key}
-              style={styles.eventRow}
-              onPress={() => {
-                if (event.kind === 'shelf_add') router.push(`/book/${event.bookId}`);
-                else if (event.kind === 'new_friend') router.push(`/profile/${event.friendId}`);
-                else router.push(`/profile/${event.counterpartId}`);
-              }}
-            >
+            <View key={event.key} style={styles.eventRow}>
               {event.kind === 'shelf_add' && (
                 <Text style={styles.eventText}>
-                  <Text style={styles.bold}>{event.actorName}</Text> added "{event.bookTitle}" to
-                  their shelf
+                  <InlineLink href={`/profile/${event.actorId}`}>{event.actorName}</InlineLink>{' '}
+                  added "<InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
+                  to their shelf
                 </Text>
               )}
               {event.kind === 'new_friend' && (
                 <Text style={styles.eventText}>
-                  You and <Text style={styles.bold}>{event.friendName}</Text> are now friends
+                  You and{' '}
+                  <InlineLink href={`/profile/${event.friendId}`}>{event.friendName}</InlineLink>{' '}
+                  are now friends
                 </Text>
               )}
               {event.kind === 'loan_active' && (
@@ -313,13 +333,20 @@ export default function Activity() {
                   <Text style={styles.eventText}>
                     {event.role === 'lender' ? (
                       <>
-                        You lent "{event.bookTitle}" to{' '}
-                        <Text style={styles.bold}>{event.counterpartName}</Text>
+                        You lent "
+                        <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
+                        to{' '}
+                        <InlineLink href={`/profile/${event.counterpartId}`}>
+                          {event.counterpartName}
+                        </InlineLink>
                       </>
                     ) : (
                       <>
-                        <Text style={styles.bold}>{event.counterpartName}</Text> lent you "
-                        {event.bookTitle}"
+                        <InlineLink href={`/profile/${event.counterpartId}`}>
+                          {event.counterpartName}
+                        </InlineLink>{' '}
+                        lent you "
+                        <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
                       </>
                     )}
                   </Text>
@@ -337,18 +364,25 @@ export default function Activity() {
                 <Text style={styles.eventText}>
                   {event.role === 'lender' ? (
                     <>
-                      <Text style={styles.bold}>{event.counterpartName}</Text> returned "
-                      {event.bookTitle}"
+                      <InlineLink href={`/profile/${event.counterpartId}`}>
+                        {event.counterpartName}
+                      </InlineLink>{' '}
+                      returned "
+                      <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>"
                     </>
                   ) : (
                     <>
-                      You returned "{event.bookTitle}" to{' '}
-                      <Text style={styles.bold}>{event.counterpartName}</Text>
+                      You returned "
+                      <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>" to{' '}
+                      <InlineLink href={`/profile/${event.counterpartId}`}>
+                        {event.counterpartName}
+                      </InlineLink>
                     </>
                   )}
                 </Text>
               )}
-            </Pressable>
+              <Text style={styles.timestamp}>{timeAgo(event.timestamp)}</Text>
+            </View>
           ))
         )}
       </View>
@@ -373,7 +407,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    gap: 8,
+    gap: 6,
   },
   needsYouText: {
     fontFamily: fonts.regular,
@@ -383,11 +417,13 @@ const styles = StyleSheet.create({
   needsYouActions: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 2,
   },
   eventRow: {
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: 4,
   },
   eventText: {
     fontFamily: fonts.regular,
@@ -397,9 +433,10 @@ const styles = StyleSheet.create({
   loanRow: {
     gap: 8,
   },
-  bold: {
-    fontFamily: fonts.semibold,
-    color: colors.text,
+  timestamp: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textFaint,
   },
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
