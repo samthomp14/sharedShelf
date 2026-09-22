@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { prefetchBook } from '../../../lib/bookDetail';
 import { colors, fonts } from '../../../lib/theme';
 
 interface Book {
@@ -21,7 +22,6 @@ export default function AuthorBooks() {
   const load = useCallback(async () => {
     if (!authorName) return;
     setLoading(true);
-    setBooks([]);
     const { data, error } = await supabase
       .from('books')
       .select('id, title, cover_url')
@@ -55,7 +55,16 @@ export default function AuthorBooks() {
           !loading ? <Text style={styles.emptyBody}>No books by this author yet.</Text> : null
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/book/${item.id}`)}>
+          <Pressable
+            style={styles.card}
+            onPressIn={() => prefetchBook(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: '/book/[id]',
+                params: { id: item.id, title: item.title, coverUrl: item.cover_url ?? '' },
+              })
+            }
+          >
             {item.cover_url ? (
               <Image source={{ uri: item.cover_url }} style={styles.cover} resizeMode="cover" />
             ) : (

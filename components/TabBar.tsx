@@ -23,26 +23,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const indicatorWidth = useRef(new Animated.Value(0)).current;
   const hasMeasuredOnce = useRef(false);
 
-  const visibleRoutes = state.routes.filter((route) => {
-    const itemStyle = StyleSheet.flatten(descriptors[route.key].options.tabBarItemStyle);
-    return itemStyle?.display !== 'none';
-  });
-
   const activeRoute = state.routes[state.index];
-  const isActiveVisible = visibleRoutes.some((route) => route.key === activeRoute.key);
-
-  // Hidden routes (href: null, e.g. profile/settings, book/[id]) have no tab
-  // bar item to measure — keep the indicator on whichever visible tab it was
-  // last on instead of letting it snap to a stale/unrelated measurement.
-  const lastVisibleKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (isActiveVisible) {
-      lastVisibleKeyRef.current = activeRoute.key;
-    }
-  }, [isActiveVisible, activeRoute.key]);
-
-  const highlightKey = isActiveVisible ? activeRoute.key : lastVisibleKeyRef.current;
-  const activeMeasurement = highlightKey ? measurements[highlightKey] : undefined;
+  const activeMeasurement = measurements[activeRoute.key];
 
   useEffect(() => {
     if (!activeMeasurement) return;
@@ -80,16 +62,10 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         />
       </View>
       <View style={styles.row}>
-        {visibleRoutes.map((route) => {
+        {state.routes.map((route) => {
           const { options } = descriptors[route.key];
           const label = typeof options.title === 'string' ? options.title : route.name;
-          const highlighted = route.key === highlightKey;
-          // Distinct from `highlighted`: this is whether the route is the
-          // *actual* active route (not just which tab the indicator is
-          // pinned to) — pressing a tab must still navigate even when it's
-          // already highlighted because you're on one of its hidden/detail
-          // screens (e.g. pressing "Activity" while on /book/[id]).
-          const isCurrentRoute = route.key === activeRoute.key;
+          const isActive = route.key === activeRoute.key;
 
           return (
             <Pressable
@@ -100,7 +76,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   target: route.key,
                   canPreventDefault: true,
                 });
-                if (!isCurrentRoute && !event.defaultPrevented) {
+                if (!isActive && !event.defaultPrevented) {
                   navigation.navigate(route.name);
                 }
               }}
@@ -110,7 +86,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               }}
               style={styles.tab}
             >
-              <Text style={[styles.label, highlighted && styles.labelActive]}>{label}</Text>
+              <Text style={[styles.label, isActive && styles.labelActive]}>{label}</Text>
             </Pressable>
           );
         })}

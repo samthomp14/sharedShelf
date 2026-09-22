@@ -1,13 +1,18 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, type Href } from 'expo-router';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Avatar } from '../../components/Avatar';
-import { Button } from '../../components/Button';
-import { InlineLink } from '../../components/InlineLink';
-import { timeAgo } from '../../lib/time';
-import { colors, fonts } from '../../lib/theme';
+import { supabase } from '../../../lib/supabase';
+import { prefetchBook } from '../../../lib/bookDetail';
+import { useAuth } from '../../../contexts/AuthContext';
+import { Avatar } from '../../../components/Avatar';
+import { Button } from '../../../components/Button';
+import { InlineLink } from '../../../components/InlineLink';
+import { timeAgo } from '../../../lib/time';
+import { colors, fonts } from '../../../lib/theme';
+
+function bookHref(id: string, title: string, coverUrl: string | null): Href {
+  return { pathname: '/book/[id]', params: { id, title, coverUrl: coverUrl ?? '' } };
+}
 
 interface LoanRequestNeedsYou {
   id: string;
@@ -304,7 +309,12 @@ export default function Activity() {
                     </InlineLink>{' '}
                     wants to borrow "
                     {book ? (
-                      <InlineLink href={`/book/${book.id}`}>{book.title}</InlineLink>
+                      <InlineLink
+                        href={bookHref(book.id, book.title, book.cover_url)}
+                        onPressIn={() => prefetchBook(book.id)}
+                      >
+                        {book.title}
+                      </InlineLink>
                     ) : (
                       'a book'
                     )}
@@ -398,7 +408,12 @@ export default function Activity() {
                             {event.actorName}
                           </InlineLink>{' '}
                           added "
-                          <InlineLink href={`/book/${event.bookId}`}>{event.bookTitle}</InlineLink>
+                          <InlineLink
+                            href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
+                            onPressIn={() => prefetchBook(event.bookId)}
+                          >
+                            {event.bookTitle}
+                          </InlineLink>
                           " to their shelf
                         </>
                       )}
@@ -415,7 +430,10 @@ export default function Activity() {
                         (event.role === 'lender' ? (
                           <>
                             You lent "
-                            <InlineLink href={`/book/${event.bookId}`}>
+                            <InlineLink
+                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
+                              onPressIn={() => prefetchBook(event.bookId)}
+                            >
                               {event.bookTitle}
                             </InlineLink>
                             " to{' '}
@@ -429,7 +447,10 @@ export default function Activity() {
                               {event.counterpartName}
                             </InlineLink>{' '}
                             lent you "
-                            <InlineLink href={`/book/${event.bookId}`}>
+                            <InlineLink
+                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
+                              onPressIn={() => prefetchBook(event.bookId)}
+                            >
                               {event.bookTitle}
                             </InlineLink>
                             "
@@ -442,7 +463,10 @@ export default function Activity() {
                               {event.counterpartName}
                             </InlineLink>{' '}
                             returned "
-                            <InlineLink href={`/book/${event.bookId}`}>
+                            <InlineLink
+                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
+                              onPressIn={() => prefetchBook(event.bookId)}
+                            >
                               {event.bookTitle}
                             </InlineLink>
                             "
@@ -450,7 +474,10 @@ export default function Activity() {
                         ) : (
                           <>
                             You returned "
-                            <InlineLink href={`/book/${event.bookId}`}>
+                            <InlineLink
+                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
+                              onPressIn={() => prefetchBook(event.bookId)}
+                            >
                               {event.bookTitle}
                             </InlineLink>
                             " to{' '}

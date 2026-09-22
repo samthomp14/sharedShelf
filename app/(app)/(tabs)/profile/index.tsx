@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../contexts/AuthContext';
-import { Avatar } from '../../../components/Avatar';
-import { Button } from '../../../components/Button';
-import { ShelfGrid } from '../../../components/ShelfGrid';
-import { colors, fonts } from '../../../lib/theme';
+import { supabase } from '../../../../lib/supabase';
+import { useAuth } from '../../../../contexts/AuthContext';
+import { Avatar } from '../../../../components/Avatar';
+import { Button } from '../../../../components/Button';
+import { ShelfGrid } from '../../../../components/ShelfGrid';
+import { colors, fonts } from '../../../../lib/theme';
 
 interface OwnProfile {
   username: string;

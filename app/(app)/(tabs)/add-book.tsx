@@ -14,10 +14,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../../components/Button';
-import { colors, fonts, inputStyle } from '../../lib/theme';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
+import { Button } from '../../../components/Button';
+import { colors, fonts, inputStyle } from '../../../lib/theme';
 
 interface OpenLibraryBook {
   title?: string;

@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Chip } from './Chip';
+import { prefetchBook } from '../lib/bookDetail';
 import { colors, fonts } from '../lib/theme';
 
 interface ShelfGridItem {
@@ -27,7 +28,14 @@ export function ShelfGrid({ items, emptyText }: ShelfGridProps) {
         <Pressable
           key={item.id}
           style={styles.card}
-          onPress={() => item.book && router.push(`/book/${item.book.id}`)}
+          onPressIn={() => item.book && prefetchBook(item.book.id)}
+          onPress={() =>
+            item.book &&
+            router.push({
+              pathname: '/book/[id]',
+              params: { id: item.book.id, title: item.book.title, coverUrl: item.book.cover_url ?? '' },
+            })
+          }
         >
           {item.book?.cover_url ? (
             <Image source={{ uri: item.book.cover_url }} style={styles.cover} resizeMode="cover" />

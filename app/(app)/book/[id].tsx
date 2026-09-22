@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { loadBookAndCopies } from '../../../lib/bookDetail';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
@@ -23,10 +24,20 @@ interface CopyRow {
 }
 
 export default function BookDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, title: placeholderTitle, coverUrl: placeholderCoverUrl } = useLocalSearchParams<{
+    id: string;
+    title?: string;
+    coverUrl?: string;
+  }>();
   const { session } = useAuth();
   const ownerId = session?.user?.id ?? null;
-  const [book, setBook] = useState<Book | null>(null);
+  // The list you tapped from already had the title/cover — render with that
+  // immediately instead of a blank screen while the full fetch is in flight.
+  const [book, setBook] = useState<Book | null>(() =>
+    id && placeholderTitle
+      ? { id, title: placeholderTitle, authors: [], cover_url: placeholderCoverUrl || null }
+      : null
+  );
   const [copies, setCopies] = useState<CopyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestingId, setRequestingId] = useState<string | null>(null);
@@ -35,19 +46,13 @@ export default function BookDetail() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    setBook(null);
-    setCopies([]);
 
-    const [bookResult, copiesResult] = await Promise.all([
-      supabase.from('books').select('id, title, authors, cover_url').eq('id', id).single(),
-      supabase
-        .from('shelf_items')
-        .select('id, status, owner_id, owner:profiles(username, display_name)')
-        .eq('book_id', id),
-    ]);
+    const [bookResult, copiesResult] = await loadBookAndCopies(id);
 
     if (!bookResult.error && bookResult.data) {
       setBook(bookResult.data);
+    } else if (bookResult.error) {
+      setBook(null);
     }
     if (!copiesResult.error && copiesResult.data) {
       setCopies(copiesResult.data as unknown as CopyRow[]);

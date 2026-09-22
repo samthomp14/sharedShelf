@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../../components/Button';
-import { colors, fonts, inputStyle } from '../../lib/theme';
+import { supabase } from '../../../lib/supabase';
+import { prefetchBook } from '../../../lib/bookDetail';
+import { useAuth } from '../../../contexts/AuthContext';
+import { Button } from '../../../components/Button';
+import { colors, fonts, inputStyle } from '../../../lib/theme';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -190,7 +191,17 @@ export default function Search() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Books</Text>
             {books.map((item) => (
-              <Pressable key={item.id} style={styles.bookRow} onPress={() => router.push(`/book/${item.id}`)}>
+              <Pressable
+                key={item.id}
+                style={styles.bookRow}
+                onPressIn={() => prefetchBook(item.id)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/book/[id]',
+                    params: { id: item.id, title: item.title, coverUrl: item.cover_url ?? '' },
+                  })
+                }
+              >
                 {item.cover_url ? (
                   <Image source={{ uri: item.cover_url }} style={styles.bookCover} resizeMode="cover" />
                 ) : (
