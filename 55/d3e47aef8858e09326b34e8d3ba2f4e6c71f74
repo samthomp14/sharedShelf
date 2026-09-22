@@ -1,0 +1,69 @@
+components/ShelfGrid.tsx
+  s_c86a18bb0c7282::t_08ac0e87cbd6fc 71-72,81-82,85
+  s_c86a18bb0c7282::t_75a04031b81986 5
+app/_layout.tsx
+  s_c86a18bb0c7282::t_df08effdff94ea 50-56
+  s_c86a18bb0c7282::t_942d35d0f294bf 5,7-16
+app/(app)/(tabs)/_layout.tsx
+  s_c86a18bb0c7282::t_6595ceeb323bc3 14
+app/(auth)/sign-in.tsx
+  s_c86a18bb0c7282::t_f549c88403ab51 162-163
+  s_c86a18bb0c7282::t_c0bc1cc1c7d8d2 179
+app/(app)/author/[name].tsx
+  s_c86a18bb0c7282::t_457e10833236d6 91-92,109-110,119-120,123
+  s_c86a18bb0c7282::t_d24bfaa7a8260b 6
+components/FilterChip.tsx
+  s_c86a18bb0c7282::t_b281d1a7bdd21e 22
+components/Button.tsx
+  s_c86a18bb0c7282::t_70d1479e6a875c 35
+components/Chip.tsx
+  s_c86a18bb0c7282::t_48e401f12476af 16-18,25
+components/Avatar.tsx
+  s_c86a18bb0c7282::t_afaabb55888f05 2,10-11,14
+  s_c86a18bb0c7282::t_57957b088dfb6d 30,36,39-40
+app/(app)/(tabs)/index.tsx
+  s_c86a18bb0c7282::t_f0ba28d95d80d2 11
+  s_c86a18bb0c7282::t_0d31538c8378b7 563-564,573-574,577
+app/(app)/(tabs)/search.tsx
+  s_c86a18bb0c7282::t_b0e9e6b77b622a 8
+  s_c86a18bb0c7282::t_2274760dabe3ee 276-277,286-287,290
+lib/theme.ts
+  s_c86a18bb0c7282::t_3f397f3077c0c9 1-3,8-16,22-31,42-51,53-56,60-64,71
+  s_c86a18bb0c7282::t_b8b6b72680e148 52,57
+app/(app)/(tabs)/add-book.tsx
+  s_c86a18bb0c7282::t_cbd68eef61149d 20
+  s_c86a18bb0c7282::t_fb393f506fdaf2 407-408
+  s_c86a18bb0c7282::t_1230b6f3f53e71 457
+app/(app)/profile/[id].tsx
+  s_c86a18bb0c7282::t_befd60e7f1a046 214-215
+package.json
+  s_c86a18bb0c7282::t_8bff69f54e55ca 6-7,14
+app/(app)/(tabs)/profile/index.tsx
+  s_c86a18bb0c7282::t_36ac1e6250cc06 136-137
+app/(app)/book/[id].tsx
+  s_c86a18bb0c7282::t_1265156d0c28ae 10
+  s_c86a18bb0c7282::t_55a40845d9b38e 186-187,197-198,201,207-208
+package-lock.json
+  s_c86a18bb0c7282::t_48673a5880075f 11-12,19,1193-1196,1205-1210,3700-3702
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "55d3e47aef8858e09326b34e8d3ba2f4e6c71f74",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_c86a18bb0c7282": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f47a5092-173c-4d17-b385-bd833778c15f",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
