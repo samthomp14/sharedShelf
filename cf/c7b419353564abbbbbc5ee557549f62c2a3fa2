@@ -1,0 +1,32 @@
+supabase/schema.sql
+  s_4bce0776e9e58c::t_74f1282ca7863d 5-8
+  s_4bce0776e9e58c::t_ed3fe958412e94 38-40
+  s_4bce0776e9e58c::t_66c2573b3aeea9 91-143
+app/(app)/search.tsx
+  s_4bce0776e9e58c::t_c22e62be26c7ea 1-2,8-10,33-62,64,71,79,82-84,87,91-94
+  s_4bce0776e9e58c::t_a342f96f41652a 159,162
+  s_4bce0776e9e58c::t_472f0bd2ab4d90 95
+lib/database.types.ts
+  s_4bce0776e9e58c::t_e096427b510067 65-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cfc7b419353564abbbbbc5ee557549f62c2a3fa2",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_4bce0776e9e58c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59442ac8-dc1e-4899-a609-f137fba76b65",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
