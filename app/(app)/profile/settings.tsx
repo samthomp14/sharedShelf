@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
 import { colors, fonts, inputStyle } from '../../../lib/theme';
 
@@ -14,6 +15,8 @@ function friendlyError(message: string): string {
 }
 
 export default function ProfileSettings() {
+  const { session } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -25,13 +28,11 @@ export default function ProfileSettings() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [uid]);
 
   async function load() {
     setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    setEmail(userData.user?.email ?? '');
+    setEmail(session?.user?.email ?? '');
     if (!uid) {
       setLoading(false);
       return;
@@ -60,14 +61,8 @@ export default function ProfileSettings() {
       return;
     }
 
+    if (!uid) return;
     setSaving(true);
-
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (!uid) {
-      setSaving(false);
-      return;
-    }
 
     const { error: updateError } = await supabase
       .from('profiles')

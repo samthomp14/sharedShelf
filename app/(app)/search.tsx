@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
 
@@ -23,6 +24,8 @@ interface BookResult {
 
 export default function Search() {
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -65,9 +68,6 @@ export default function Search() {
     setSearching(true);
     setSearched(true);
 
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-
     const [peopleRes, booksRes, authorsRes] = await Promise.all([
       supabase
         .from('profiles')
@@ -94,14 +94,8 @@ export default function Search() {
   }, [query]);
 
   async function sendRequest(target: PersonResult) {
+    if (!uid) return;
     setSendingId(target.id);
-
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (!uid) {
-      setSendingId(null);
-      return;
-    }
 
     const { data: existing } = await supabase
       .from('friendships')

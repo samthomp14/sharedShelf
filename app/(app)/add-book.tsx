@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
 
@@ -56,6 +57,7 @@ function toTitleCase(str: string): string {
 
 export default function AddBook() {
   const router = useRouter();
+  const { session } = useAuth();
   const [isbn, setIsbn] = useState('');
   const [title, setTitle] = useState('');
   const [authors, setAuthors] = useState('');
@@ -195,8 +197,7 @@ export default function AddBook() {
 
     setLoading(true);
 
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
+    const uid = session?.user?.id;
     if (!uid) {
       setError('You need to be signed in.');
       setLoading(false);

@@ -21,6 +21,7 @@ export default function AuthorBooks() {
   const load = useCallback(async () => {
     if (!authorName) return;
     setLoading(true);
+    setBooks([]);
     const { data, error } = await supabase
       .from('books')
       .select('id, title, cover_url')

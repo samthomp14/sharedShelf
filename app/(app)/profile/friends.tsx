@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { colors, fonts } from '../../../lib/theme';
 
@@ -14,17 +15,17 @@ interface FriendRow {
 
 export default function Friends() {
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [friends, setFriends] = useState<FriendRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
     if (!uid) {
       setLoading(false);
       return;
     }
+    setLoading(true);
 
     const { data, error } = await supabase
       .from('friendships')
@@ -49,7 +50,7 @@ export default function Friends() {
     }
 
     setLoading(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {

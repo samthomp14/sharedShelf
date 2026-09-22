@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { InlineLink } from '../../components/InlineLink';
@@ -94,6 +95,8 @@ function CoverThumb({ url, title }: { url: string | null; title: string }) {
 }
 
 export default function Activity() {
+  const { session } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [loanRequests, setLoanRequests] = useState<LoanRequestNeedsYou[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequestNeedsYou[]>([]);
   const [events, setEvents] = useState<FeedEvent[]>([]);
@@ -102,13 +105,11 @@ export default function Activity() {
   const [returningId, setReturningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
     if (!uid) {
       setLoading(false);
       return;
     }
+    setLoading(true);
 
     const [loanReqRes, friendReqRes, shelfAddRes, friendshipsRes, loansRes] = await Promise.all([
       supabase
@@ -234,7 +235,7 @@ export default function Activity() {
     merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     setEvents(merged.slice(0, 40));
     setLoading(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {

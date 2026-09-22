@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { ShelfGrid } from '../../../components/ShelfGrid';
@@ -22,19 +23,19 @@ interface ShelfItemRow {
 
 export default function Profile() {
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [friendCount, setFriendCount] = useState(0);
   const [items, setItems] = useState<ShelfItemRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
     if (!uid) {
       setLoading(false);
       return;
     }
+    setLoading(true);
 
     const [profileResult, countResult, itemsResult] = await Promise.all([
       supabase.from('profiles').select('username, display_name, avatar_url, bio').eq('id', uid).single(),
@@ -57,7 +58,7 @@ export default function Profile() {
       setItems(itemsResult.data as unknown as ShelfItemRow[]);
     }
     setLoading(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {

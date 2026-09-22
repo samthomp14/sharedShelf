@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { ShelfGrid } from '../../../components/ShelfGrid';
@@ -25,7 +26,8 @@ type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const { session } = useAuth();
+  const ownerId = session?.user?.id ?? null;
   const [profile, setProfile] = useState<OtherProfile | null>(null);
   const [friendCount, setFriendCount] = useState(0);
   const [items, setItems] = useState<ShelfItemRow[]>([]);
@@ -38,11 +40,7 @@ export default function UserProfile() {
     if (!id) return;
     setLoading(true);
 
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    setOwnerId(uid ?? null);
-
-    if (uid && uid === id) {
+    if (ownerId && ownerId === id) {
       router.replace('/profile');
       return;
     }
@@ -50,11 +48,11 @@ export default function UserProfile() {
     const [profileResult, countResult, friendshipResult, itemsResult] = await Promise.all([
       supabase.from('profiles').select('username, display_name, avatar_url, bio').eq('id', id).single(),
       supabase.rpc('friend_count', { target: id }),
-      uid
+      ownerId
         ? supabase
             .from('friendships')
             .select('id, requester_id, status')
-            .or(`and(requester_id.eq.${uid},addressee_id.eq.${id}),and(requester_id.eq.${id},addressee_id.eq.${uid})`)
+            .or(`and(requester_id.eq.${ownerId},addressee_id.eq.${id}),and(requester_id.eq.${id},addressee_id.eq.${ownerId})`)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       supabase
@@ -79,7 +77,7 @@ export default function UserProfile() {
       setFriendshipId(friendshipResult.data.id);
       if (friendshipResult.data.status === 'accepted') {
         setStatus('friends');
-      } else if (friendshipResult.data.requester_id === uid) {
+      } else if (friendshipResult.data.requester_id === ownerId) {
         setStatus('pending_sent');
       } else {
         setStatus('pending_received');
@@ -90,7 +88,7 @@ export default function UserProfile() {
     }
 
     setLoading(false);
-  }, [id, router]);
+  }, [id, router, ownerId]);
 
   useFocusEffect(
     useCallback(() => {
