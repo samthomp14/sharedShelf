@@ -1,0 +1,63 @@
+components/TabBar.tsx
+  s_74e52dd94d8845::t_b550dab54a3a97 27
+  s_74e52dd94d8845::t_a2fead659cfc1b 65,68,79,89
+components/ShelfGrid.tsx
+  s_74e52dd94d8845::t_2d3524a6b17c65 4
+  s_74e52dd94d8845::t_aba9760716537c 31-38
+app/(app)/(tabs)/_layout.tsx
+  s_74e52dd94d8845::t_a54feb72d6226b 1-23
+app/(app)/(tabs)/search.tsx
+  s_74e52dd94d8845::t_a0e9bdf1ef8cef 4,6-8
+  s_74e52dd94d8845::t_7713f69f5bf6f8 194-204,227,231
+  s_74e52dd94d8845::t_49307c235b2d02 5
+app/(app)/book/[id].tsx
+  s_74e52dd94d8845::t_abc00c3d073299 27-31,34-40,50,54-55
+  s_74e52dd94d8845::t_00b84b9f4b8288 5
+components/InlineLink.tsx
+  s_74e52dd94d8845::t_ee599ce9780c61 1,5,7,13,15
+app/(app)/(tabs)/add-book.tsx
+  s_74e52dd94d8845::t_d8327727a44df4 17-20
+app/(app)/_layout.tsx
+  s_74e52dd94d8845::t_9e4b841f2eeb89 1,6,13-19
+lib/prefetch.ts
+  s_74e52dd94d8845::t_059a3ec8d611c6 1-17
+lib/bookDetail.ts
+  s_74e52dd94d8845::t_ee028b3c53d316 1-24
+app/(app)/author/[name].tsx
+  s_74e52dd94d8845::t_37ec674b1c4d03 58-67
+  s_74e52dd94d8845::t_ec182335cc9729 5
+app/(app)/(tabs)/index.tsx
+  s_74e52dd94d8845::t_1306e8fe13f781 477-480
+  s_74e52dd94d8845::t_985935feb1cb6d 2,5,12-15,27,38,88,100,513
+  s_74e52dd94d8845::t_2573f1a77359db 313
+  s_74e52dd94d8845::t_e86b96fa152e3c 4,6-11
+  s_74e52dd94d8845::t_246285a6fd54c0 466-469
+  s_74e52dd94d8845::t_c7bd28a9f31e2f 412
+  s_74e52dd94d8845::t_3bba0784d9c835 450-453
+  s_74e52dd94d8845::t_5ca59d80170062 411,413-416
+  s_74e52dd94d8845::t_50ef31391fcc51 312,314-317
+  s_74e52dd94d8845::t_96a7f4ef756df6 433-436
+app/(app)/(tabs)/profile/index.tsx
+  s_74e52dd94d8845::t_b65fe23c2d55f4 4-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4fcdd997a8fe69a03e260a3d03c245c916d712f5",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_74e52dd94d8845": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c3cf7a6-35df-47af-9457-768c90569b9b",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
