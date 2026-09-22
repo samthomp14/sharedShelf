@@ -1,0 +1,87 @@
+app/(app)/book/[id].tsx
+  s_8bfe20154e662d::t_029f11852f9e51 249-250,255,261-263
+  s_8bfe20154e662d::t_758f2a347e09d2 251-254
+  s_8bfe20154e662d::t_c6fb4e728dd79b 56-57,69,72,77
+  s_8bfe20154e662d::t_8f57e157d9e9e6 27-38
+  s_8bfe20154e662d::t_a5ad4cc14617dc 10
+  s_8bfe20154e662d::t_52757457d277a2 122-127,129-135,159-163,167-169
+  s_8bfe20154e662d::t_0555a1c1543f65 128
+components/Skeleton.tsx
+  s_8bfe20154e662d::t_8e28b24891690e 7-8,17,31-35
+  s_8bfe20154e662d::t_e51f53d42d6a22 1-6,9-16,18-30,36-71
+app/(app)/author/[name].tsx
+  s_8bfe20154e662d::t_9f145f177aa48b 120-130
+  s_8bfe20154e662d::t_8f221ec61cbd4d 20,37,46-61
+  s_8bfe20154e662d::t_a5ebafca90766a 6
+  s_8bfe20154e662d::t_cdef6c00949cc6 62
+lib/profileHref.ts
+  s_8bfe20154e662d::t_33c55aea423b3f 1-19
+app/(app)/profile/friends.tsx
+  s_8bfe20154e662d::t_2ec967fe70f982 24,29
+  s_8bfe20154e662d::t_38a85d966ff8bf 5
+  s_8bfe20154e662d::t_e55a1e31321664 101-104
+  s_8bfe20154e662d::t_08994157d266f2 57,66-82
+  s_8bfe20154e662d::t_04c23474025c30 8-9
+  s_8bfe20154e662d::t_4147c8b27e78e7 83
+app/(app)/(tabs)/search.tsx
+  s_8bfe20154e662d::t_6babd23aa064ca 177-180
+  s_8bfe20154e662d::t_d0821a0f1262f9 77
+  s_8bfe20154e662d::t_725072592954a4 6
+  s_8bfe20154e662d::t_87d418879daabe 18
+app/(app)/_layout.tsx
+  s_8bfe20154e662d::t_d542b55c8457c1 16
+app/(app)/(tabs)/profile/index.tsx
+  s_8bfe20154e662d::t_4043676bc374ec 9-10
+  s_8bfe20154e662d::t_f738af788473c5 208
+  s_8bfe20154e662d::t_da59d962a45531 162-164
+  s_8bfe20154e662d::t_69738933ced687 70-94,96-99
+  s_8bfe20154e662d::t_2a05b22e1299e9 127-136
+  s_8bfe20154e662d::t_5ad99324533b52 95
+  s_8bfe20154e662d::t_af8619ce35c022 187-189,200-207,209
+app/(app)/profile/settings.tsx
+  s_8bfe20154e662d::t_58231cadb4fd87 31-33,49
+  s_8bfe20154e662d::t_cacef5d660a76b 113
+  s_8bfe20154e662d::t_b0cb6b1d1960db 126
+  s_8bfe20154e662d::t_631fbb7df1daa3 2,21-27,41
+  s_8bfe20154e662d::t_3a9ac5440c9fbc 99
+app/(app)/profile/[username].tsx
+  s_8bfe20154e662d::t_eb2834c8d0b213 9,29-45,58,145-156,158-305
+  s_8bfe20154e662d::t_ece72a2495ca33 13,21,49-57,59-108,127,140
+  s_8bfe20154e662d::t_77c830afed2cfd 157
+  s_8bfe20154e662d::t_9793b756ce4ea4 117-121
+app/(app)/(tabs)/index.tsx
+  s_8bfe20154e662d::t_2791e86c6fdae2 223
+  s_8bfe20154e662d::t_31cb3ae0c4168b 362-364
+  s_8bfe20154e662d::t_063c8ea9512653 420
+  s_8bfe20154e662d::t_9e99ae519b8775 503-505
+  s_8bfe20154e662d::t_d46e8d9b1f93cc 436
+  s_8bfe20154e662d::t_8a07314c877add 479-481
+  s_8bfe20154e662d::t_64a10e1ec25834 238
+  s_8bfe20154e662d::t_605b22d3234779 182
+  s_8bfe20154e662d::t_7ae37b06364268 6
+  s_8bfe20154e662d::t_589259bf6ab9f4 453-455,461-463
+  s_8bfe20154e662d::t_39a6004b21a20b 202
+  s_8bfe20154e662d::t_1679265a009432 316-318
+  s_8bfe20154e662d::t_eea7df465aad2f 47,59,70,83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0fe4a3b523f76433165a49bc6623cb5252718a9",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_8bfe20154e662d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cf6ffd53-51da-4fdc-807a-46403daae235",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
