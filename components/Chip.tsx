@@ -13,13 +13,15 @@ const styles = StyleSheet.create({
   chip: {
     alignSelf: 'flex-start',
     backgroundColor: colors.chipBackground,
-    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
   text: {
     fontFamily: fonts.semibold,
     fontSize: 12,
-    color: colors.text,
+    color: colors.accent,
   },
 });

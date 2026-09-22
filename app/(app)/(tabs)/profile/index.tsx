@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   name: {
-    fontFamily: fonts.semibold,
-    fontSize: 17,
+    fontFamily: fonts.displayItalic,
+    fontSize: 19,
     color: colors.text,
   },
   username: {

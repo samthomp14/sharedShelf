@@ -17,7 +17,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
-import { colors, fonts, inputStyle } from '../../../lib/theme';
+import { colors, fonts, inputStyle, organicCorners, radius } from '../../../lib/theme';
 
 interface OpenLibraryBook {
   title?: string;
@@ -404,6 +404,8 @@ const styles = StyleSheet.create({
     width: 110,
     height: 165,
     backgroundColor: colors.chipBackground,
+    overflow: 'hidden',
+    ...organicCorners,
   },
   errorText: {
     fontFamily: fonts.medium,
@@ -452,6 +454,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingVertical: 12,
     paddingHorizontal: 24,
+    borderRadius: radius.md,
   },
   scannerCloseText: {
     fontFamily: fonts.semibold,

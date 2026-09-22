@@ -1,25 +1,34 @@
-// Design tokens modeled after nyc-map-murex.vercel.app: near-black on white,
-// sharp square corners, thin hairline borders with a soft shadow instead of
-// fills, and Funnel Sans throughout.
+// Design tokens: "Vellum Ink" — ink black with a hint of blue on a
+// matching off-white paper, softened corners, and a serif/sans pairing.
+// A deliberate departure from the earlier square/near-black-on-white look.
 
 import type { TextStyle } from 'react-native';
 
 export const colors = {
-  text: '#0a0a0a',
-  textMuted: '#666666',
-  textFaint: '#999999',
-  background: '#ffffff',
-  border: '#e5e5e5',
-  chipBackground: '#f2f2f2',
+  text: '#0e1116',
+  textMuted: '#5a6068',
+  textFaint: '#8a93a0',
+  background: '#f5f7fa',
+  border: 'rgba(14, 17, 22, 0.14)',
+  chipBackground: '#e5e9ee',
+  // Slate blue — the "hint" color. Used sparingly: status tags, small
+  // accents. Never as a primary surface or button fill.
+  accent: '#34506b',
   danger: '#c00000',
   success: '#0a7d2c',
 };
 
 export const fonts = {
-  regular: 'FunnelSans_400Regular',
-  medium: 'FunnelSans_500Medium',
-  semibold: 'FunnelSans_600SemiBold',
-  bold: 'FunnelSans_700Bold',
+  // Body copy, buttons, labels, chips.
+  regular: 'WorkSans_400Regular',
+  medium: 'WorkSans_500Medium',
+  semibold: 'WorkSans_600SemiBold',
+  bold: 'WorkSans_700Bold',
+  // Headings, titles, names — an upright or italic serif for a literary,
+  // less mechanical feel than the body face.
+  display: 'LibreBaskerville_400Regular',
+  displaySemibold: 'LibreBaskerville_600SemiBold',
+  displayItalic: 'LibreBaskerville_400Regular_Italic',
 };
 
 export const spacing = {
@@ -30,23 +39,36 @@ export const spacing = {
   xl: 32,
 };
 
-// Every surface uses square corners — this is a deliberate 0 everywhere,
-// not an oversight.
-export const radius = 0;
+// Uniform corner radii for controls (buttons, inputs, filter pills, tags).
+export const radius = {
+  sm: 8,
+  md: 12,
+};
+
+// Asymmetric "worn-edge" corners for surfaces that carry an image or stand
+// in for one — book covers, avatars. Opposite corners share a radius
+// (top-left/bottom-right vs. top-right/bottom-left), like a well-handled
+// book rather than a sharp die-cut rectangle.
+export const organicCorners = {
+  borderTopLeftRadius: 16,
+  borderTopRightRadius: 6,
+  borderBottomRightRadius: 16,
+  borderBottomLeftRadius: 6,
+} as const;
 
 export const shadow = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.08,
-  shadowRadius: 3,
-  elevation: 1,
+  shadowColor: colors.text,
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.1,
+  shadowRadius: 16,
+  elevation: 2,
 };
 
 export const inputStyle: TextStyle = {
   fontFamily: fonts.regular,
   borderWidth: 1,
   borderColor: colors.border,
-  borderRadius: radius,
+  borderRadius: radius.md,
   paddingHorizontal: 14,
   paddingVertical: 12,
   marginBottom: 12,

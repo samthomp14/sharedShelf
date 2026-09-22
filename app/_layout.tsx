@@ -2,13 +2,18 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import {
-  useFonts,
-  FunnelSans_400Regular,
-  FunnelSans_500Medium,
-  FunnelSans_600SemiBold,
-  FunnelSans_700Bold,
-} from '@expo-google-fonts/funnel-sans';
+  WorkSans_400Regular,
+  WorkSans_500Medium,
+  WorkSans_600SemiBold,
+  WorkSans_700Bold,
+} from '@expo-google-fonts/work-sans';
+import {
+  LibreBaskerville_400Regular,
+  LibreBaskerville_400Regular_Italic,
+  LibreBaskerville_600SemiBold,
+} from '@expo-google-fonts/libre-baskerville';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -42,10 +47,13 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    FunnelSans_400Regular,
-    FunnelSans_500Medium,
-    FunnelSans_600SemiBold,
-    FunnelSans_700Bold,
+    WorkSans_400Regular,
+    WorkSans_500Medium,
+    WorkSans_600SemiBold,
+    WorkSans_700Bold,
+    LibreBaskerville_400Regular,
+    LibreBaskerville_400Regular_Italic,
+    LibreBaskerville_600SemiBold,
   });
 
   useEffect(() => {

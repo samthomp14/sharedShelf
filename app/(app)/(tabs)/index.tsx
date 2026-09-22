@@ -8,7 +8,7 @@ import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { InlineLink } from '../../../components/InlineLink';
 import { timeAgo } from '../../../lib/time';
-import { colors, fonts } from '../../../lib/theme';
+import { colors, fonts, radius } from '../../../lib/theme';
 
 function bookHref(id: string, title: string, coverUrl: string | null): Href {
   return { pathname: '/book/[id]', params: { id, title, coverUrl: coverUrl ?? '' } };
@@ -560,6 +560,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 60,
     backgroundColor: colors.chipBackground,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   coverPlaceholder: {
     width: 40,
@@ -568,9 +570,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 3,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   coverPlaceholderText: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.display,
     fontSize: 8,
     color: colors.text,
     textAlign: 'center',

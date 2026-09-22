@@ -7,7 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
 import { AuthorList } from '../../../components/AuthorList';
-import { colors, fonts } from '../../../lib/theme';
+import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface Book {
   id: string;
@@ -183,6 +183,8 @@ const styles = StyleSheet.create({
     height: 240,
     backgroundColor: colors.chipBackground,
     marginBottom: 16,
+    overflow: 'hidden',
+    ...organicCorners,
   },
   spinePlaceholder: {
     width: 160,
@@ -192,16 +194,18 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    ...organicCorners,
   },
   spineTitle: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.display,
     fontSize: 14,
     color: colors.text,
     textAlign: 'center',
   },
   title: {
-    fontFamily: fonts.semibold,
-    fontSize: 20,
+    fontFamily: fonts.displaySemibold,
+    fontSize: 21,
     color: colors.text,
     textAlign: 'center',
     marginBottom: 4,

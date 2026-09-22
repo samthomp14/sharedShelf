@@ -2,7 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Chip } from './Chip';
 import { prefetchBook } from '../lib/bookDetail';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, organicCorners } from '../lib/theme';
 
 interface ShelfGridItem {
   id: string;
@@ -68,6 +68,8 @@ const styles = StyleSheet.create({
     aspectRatio: 2 / 3,
     backgroundColor: colors.chipBackground,
     marginBottom: 6,
+    overflow: 'hidden',
+    ...organicCorners,
   },
   spinePlaceholder: {
     width: '100%',
@@ -76,9 +78,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     padding: 8,
     justifyContent: 'center',
+    overflow: 'hidden',
+    ...organicCorners,
   },
   spineTitle: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.display,
     fontSize: 12,
     color: colors.text,
     textAlign: 'center',

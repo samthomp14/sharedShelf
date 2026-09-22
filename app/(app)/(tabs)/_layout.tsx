@@ -11,7 +11,7 @@ export default function TabsLayout() {
         headerTitle: 'sharedShelf',
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
-        headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 17 },
+        headerTitleStyle: { fontFamily: fonts.displayItalic, color: colors.text, fontSize: 19 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Activity' }} />

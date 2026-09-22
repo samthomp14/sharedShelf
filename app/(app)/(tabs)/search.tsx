@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
-import { colors, fonts, inputStyle } from '../../../lib/theme';
+import { colors, fonts, inputStyle, radius } from '../../../lib/theme';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -273,6 +273,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 66,
     backgroundColor: colors.chipBackground,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   bookSpine: {
     width: 44,
@@ -281,9 +283,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   bookSpineText: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.display,
     fontSize: 9,
     color: colors.text,
     textAlign: 'center',
