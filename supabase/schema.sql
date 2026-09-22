@@ -2,6 +2,10 @@
 -- Run this in the Supabase SQL editor (or via `supabase db push` once the CLI is linked).
 -- This is the full, current schema — safe to run top-to-bottom on a fresh project.
 
+-- pg_trgm backs the ilike '%...%' indexes used by search (profiles, books,
+-- book_authors below) — a plain btree can't serve a leading-wildcard match.
+create extension if not exists pg_trgm with schema extensions;
+
 -- ============================================================
 -- profiles: one row per auth.users, public-ish identity info
 -- ============================================================
@@ -30,6 +34,9 @@ create policy "users can insert their own profile"
   on public.profiles for insert
   to authenticated
   with check ((select auth.uid()) = id);
+
+create index profiles_username_trgm_idx on public.profiles using gin (username gin_trgm_ops);
+create index profiles_display_name_trgm_idx on public.profiles using gin (display_name gin_trgm_ops);
 
 -- Auto-create a profile row whenever a new auth user signs up. Username
 -- comes from the `username` field passed in signUp()'s options.data —
@@ -80,6 +87,59 @@ create policy "authenticated users can add books to the catalog"
   on public.books for insert
   to authenticated
   with check (true);
+
+create index books_title_trgm_idx on public.books using gin (title gin_trgm_ops);
+
+-- ============================================================
+-- book_authors: one row per (book, author), kept in sync with
+-- books.authors by trigger below. books.authors stays the source of
+-- truth (it's what the app reads/writes); this table exists only so
+-- author search doesn't have to pull every book's authors[] to the
+-- client and filter in JS — it can filter with an indexed ilike instead.
+-- ============================================================
+create table public.book_authors (
+  book_id uuid not null references public.books (id) on delete cascade,
+  author text not null,
+  primary key (book_id, author)
+);
+
+create index book_authors_author_trgm_idx on public.book_authors using gin (author gin_trgm_ops);
+
+alter table public.book_authors enable row level security;
+
+create policy "book authors are readable by any authenticated user"
+  on public.book_authors for select
+  to authenticated
+  using (true);
+
+-- No insert/update/delete policies: only the trigger below (security
+-- definer) writes to this table.
+create function public.sync_book_authors()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.book_authors where book_id = new.id;
+  insert into public.book_authors (book_id, author)
+  select new.id, author from unnest(new.authors) as author
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+create trigger on_book_authors_change
+  after insert or update of authors on public.books
+  for each row execute procedure public.sync_book_authors();
+
+revoke execute on function public.sync_book_authors() from public, anon, authenticated;
+
+-- Backfill/idempotent bootstrap: populates book_authors for any books
+-- rows that existed before this table did. No-op on a fresh project
+-- (books is empty), safe to re-run.
+insert into public.book_authors (book_id, author)
+select id, author from public.books, unnest(authors) as author
+on conflict do nothing;
 
 -- ============================================================
 -- friendships: symmetric connection, stored as one row with a

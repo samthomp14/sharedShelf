@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, inputStyle } from '../../lib/theme';
+
+const SEARCH_DEBOUNCE_MS = 300;
+const MIN_QUERY_LENGTH = 2;
 
 interface PersonResult {
   id: string;
@@ -27,17 +30,45 @@ export default function Search() {
   const [books, setBooks] = useState<BookResult[]>([]);
   const [authors, setAuthors] = useState<string[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const searchIdRef = useRef(0);
 
-  async function search() {
-    const q = query.trim();
-    if (!q) return;
+  function reset() {
+    searchIdRef.current++; // invalidate any in-flight search so it can't overwrite this reset
+    setQuery('');
+    setSearching(false);
+    setSearched(false);
+    setPeople([]);
+    setBooks([]);
+    setAuthors([]);
+  }
+
+  // Tab screens stay mounted when you switch tabs, so clear stale results
+  // (and cancel any in-flight search) when the user navigates away.
+  useFocusEffect(
+    useCallback(() => {
+      return () => reset();
+    }, [])
+  );
+
+  async function search(q: string) {
+    if (q.length < MIN_QUERY_LENGTH) {
+      searchIdRef.current++;
+      setSearching(false);
+      setSearched(false);
+      setPeople([]);
+      setBooks([]);
+      setAuthors([]);
+      return;
+    }
+
+    const requestId = ++searchIdRef.current;
     setSearching(true);
     setSearched(true);
 
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
 
-    const [peopleRes, booksRes, allBooksRes] = await Promise.all([
+    const [peopleRes, booksRes, authorsRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('id, username, display_name')
@@ -45,23 +76,22 @@ export default function Search() {
         .neq('id', uid ?? '')
         .limit(15),
       supabase.from('books').select('id, title, authors, cover_url').ilike('title', `%${q}%`).limit(15),
-      supabase.from('books').select('authors').limit(500),
+      supabase.from('book_authors').select('author').ilike('author', `%${q}%`).limit(50),
     ]);
+
+    // A newer keystroke already started another search — drop this stale response.
+    if (requestId !== searchIdRef.current) return;
 
     setPeople(peopleRes.data ?? []);
     setBooks(booksRes.data ?? []);
-
-    const lowerQ = q.toLowerCase();
-    const matchedAuthors = new Set<string>();
-    for (const row of allBooksRes.data ?? []) {
-      for (const author of row.authors ?? []) {
-        if (author.toLowerCase().includes(lowerQ)) matchedAuthors.add(author);
-      }
-    }
-    setAuthors(Array.from(matchedAuthors).slice(0, 15));
-
+    setAuthors(Array.from(new Set(authorsRes.data?.map((row) => row.author) ?? [])).slice(0, 15));
     setSearching(false);
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => search(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   async function sendRequest(target: PersonResult) {
     setSendingId(target.id);
@@ -126,10 +156,10 @@ export default function Search() {
           value={query}
           onChangeText={setQuery}
           autoCapitalize="none"
-          onSubmitEditing={search}
+          onSubmitEditing={() => search(query.trim())}
           returnKeyType="search"
         />
-        <Button title="Search" variant="secondary" onPress={search} loading={searching} />
+        <Button title="Search" variant="secondary" onPress={() => search(query.trim())} loading={searching} />
       </View>
 
       <ScrollView contentContainerStyle={styles.results}>

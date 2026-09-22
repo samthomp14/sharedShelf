@@ -62,6 +62,18 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['books']['Insert']>;
         Relationships: [];
       };
+      book_authors: {
+        Row: {
+          book_id: string;
+          author: string;
+        };
+        Insert: {
+          book_id: string;
+          author: string;
+        };
+        Update: Partial<Database['public']['Tables']['book_authors']['Insert']>;
+        Relationships: [];
+      };
       friendships: {
         Row: {
           id: string;
