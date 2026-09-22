@@ -3,6 +3,7 @@ import { useFocusEffect, type Href } from 'expo-router';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
+import { profileHref } from '../../../lib/profileHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
@@ -43,6 +44,7 @@ type FeedEvent =
       timestamp: string;
       kind: 'shelf_add';
       actorId: string;
+      actorUsername: string;
       actorName: string;
       actorAvatarUrl: string | null;
       bookId: string;
@@ -54,6 +56,7 @@ type FeedEvent =
       timestamp: string;
       kind: 'new_friend';
       friendId: string;
+      friendUsername: string;
       friendName: string;
       friendAvatarUrl: string | null;
     }
@@ -64,6 +67,7 @@ type FeedEvent =
       role: 'lender' | 'borrower';
       loanId: string;
       counterpartId: string;
+      counterpartUsername: string;
       counterpartName: string;
       counterpartAvatarUrl: string | null;
       bookId: string;
@@ -76,6 +80,7 @@ type FeedEvent =
       kind: 'loan_returned';
       role: 'lender' | 'borrower';
       counterpartId: string;
+      counterpartUsername: string;
       counterpartName: string;
       counterpartAvatarUrl: string | null;
       bookId: string;
@@ -174,6 +179,7 @@ export default function Activity() {
           timestamp: row.created_at,
           kind: 'shelf_add',
           actorId: row.owner.id,
+          actorUsername: row.owner.username,
           actorName: personName(row.owner),
           actorAvatarUrl: row.owner.avatar_url,
           bookId: row.book.id,
@@ -193,6 +199,7 @@ export default function Activity() {
           timestamp: row.responded_at ?? row.created_at,
           kind: 'new_friend',
           friendId: friend.id,
+          friendUsername: friend.username,
           friendName: personName(friend),
           friendAvatarUrl: friend.avatar_url,
         });
@@ -213,6 +220,7 @@ export default function Activity() {
             kind: 'loan_returned',
             role,
             counterpartId: counterpart.id,
+            counterpartUsername: counterpart.username,
             counterpartName: personName(counterpart),
             counterpartAvatarUrl: counterpart.avatar_url,
             bookId: book.id,
@@ -227,6 +235,7 @@ export default function Activity() {
             role,
             loanId: row.id,
             counterpartId: counterpart.id,
+            counterpartUsername: counterpart.username,
             counterpartName: personName(counterpart),
             counterpartAvatarUrl: counterpart.avatar_url,
             bookId: book.id,
@@ -304,7 +313,9 @@ export default function Activity() {
                 />
                 <View style={styles.rowMiddle}>
                   <Text style={styles.eventText}>
-                    <InlineLink href={`/profile/${req.requester?.id}`}>
+                    <InlineLink
+                      href={profileHref(req.requester?.username ?? '', req.requester?.display_name, req.requester?.avatar_url)}
+                    >
                       {personName(req.requester)}
                     </InlineLink>{' '}
                     wants to borrow "
@@ -348,7 +359,9 @@ export default function Activity() {
               />
               <View style={styles.rowMiddle}>
                 <Text style={styles.eventText}>
-                  <InlineLink href={`/profile/${req.requester?.id}`}>
+                  <InlineLink
+                    href={profileHref(req.requester?.username ?? '', req.requester?.display_name, req.requester?.avatar_url)}
+                  >
                     {personName(req.requester)}
                   </InlineLink>{' '}
                   sent you a friend request
@@ -404,7 +417,7 @@ export default function Activity() {
                   <Text style={styles.eventText}>
                     {event.kind === 'shelf_add' && (
                         <>
-                          <InlineLink href={`/profile/${event.actorId}`}>
+                          <InlineLink href={profileHref(event.actorUsername, event.actorName, event.actorAvatarUrl)}>
                             {event.actorName}
                           </InlineLink>{' '}
                           added "
@@ -420,7 +433,7 @@ export default function Activity() {
                       {event.kind === 'new_friend' && (
                         <>
                           You and{' '}
-                          <InlineLink href={`/profile/${event.friendId}`}>
+                          <InlineLink href={profileHref(event.friendUsername, event.friendName, event.friendAvatarUrl)}>
                             {event.friendName}
                           </InlineLink>{' '}
                           are now friends
@@ -437,13 +450,17 @@ export default function Activity() {
                               {event.bookTitle}
                             </InlineLink>
                             " to{' '}
-                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                            <InlineLink
+                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
+                            >
                               {event.counterpartName}
                             </InlineLink>
                           </>
                         ) : (
                           <>
-                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                            <InlineLink
+                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
+                            >
                               {event.counterpartName}
                             </InlineLink>{' '}
                             lent you "
@@ -459,7 +476,9 @@ export default function Activity() {
                       {event.kind === 'loan_returned' &&
                         (event.role === 'lender' ? (
                           <>
-                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                            <InlineLink
+                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
+                            >
                               {event.counterpartName}
                             </InlineLink>{' '}
                             returned "
@@ -481,7 +500,9 @@ export default function Activity() {
                               {event.bookTitle}
                             </InlineLink>
                             " to{' '}
-                            <InlineLink href={`/profile/${event.counterpartId}`}>
+                            <InlineLink
+                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
+                            >
                               {event.counterpartName}
                             </InlineLink>
                           </>

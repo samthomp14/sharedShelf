@@ -7,6 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
 import { AuthorList } from '../../../components/AuthorList';
+import { Skeleton } from '../../../components/Skeleton';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface Book {
@@ -21,6 +22,18 @@ interface CopyRow {
   status: string;
   owner_id: string;
   owner: { username: string; display_name: string | null } | null;
+}
+
+function CopiesSkeleton() {
+  return (
+    <>
+      {[0, 1].map((i) => (
+        <View key={i} style={styles.copyRow}>
+          <Skeleton width="45%" height={16} />
+        </View>
+      ))}
+    </>
+  );
 }
 
 export default function BookDetail() {
@@ -40,6 +53,8 @@ export default function BookDetail() {
   );
   const [copies, setCopies] = useState<CopyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookLoaded, setBookLoaded] = useState(false);
+  const [copiesLoaded, setCopiesLoaded] = useState(false);
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [returningId, setReturningId] = useState<string | null>(null);
 
@@ -51,12 +66,15 @@ export default function BookDetail() {
 
     if (!bookResult.error && bookResult.data) {
       setBook(bookResult.data);
+      setBookLoaded(true);
     } else if (bookResult.error) {
       setBook(null);
+      setBookLoaded(true);
     }
     if (!copiesResult.error && copiesResult.data) {
       setCopies(copiesResult.data as unknown as CopyRow[]);
     }
+    setCopiesLoaded(true);
     setLoading(false);
   }, [id]);
 
@@ -101,8 +119,20 @@ export default function BookDetail() {
     setReturningId(null);
   }
 
-  if (loading && !book) {
-    return <View style={styles.container} />;
+  // No placeholder to paint from (a direct/deep link, not tapped from a
+  // list) — skeleton the whole layout until the first fetch lands.
+  if (!book && loading) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Skeleton width={160} height={240} style={styles.coverSkeleton} />
+          <Skeleton width="70%" height={21} style={styles.titleSkeleton} />
+          <Skeleton width="40%" height={15} style={styles.authorsSkeleton} />
+        </View>
+        <Text style={styles.sectionTitle}>Copies you can see</Text>
+        <CopiesSkeleton />
+      </ScrollView>
+    );
   }
 
   if (!book) {
@@ -126,11 +156,17 @@ export default function BookDetail() {
           </View>
         )}
         <Text style={styles.title}>{book.title}</Text>
-        <AuthorList authors={book.authors} textStyle={styles.authors} />
+        {bookLoaded ? (
+          <AuthorList authors={book.authors} textStyle={styles.authors} />
+        ) : (
+          <Skeleton width="40%" height={15} style={styles.authorsSkeleton} />
+        )}
       </View>
 
       <Text style={styles.sectionTitle}>Copies you can see</Text>
-      {copies.length === 0 ? (
+      {!copiesLoaded ? (
+        <CopiesSkeleton />
+      ) : copies.length === 0 ? (
         <Text style={styles.emptyBody}>
           No one in your circle has this on their shelf yet.
         </Text>
@@ -210,10 +246,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
+  titleSkeleton: {
+    marginBottom: 8,
+  },
+  coverSkeleton: {
+    marginBottom: 16,
+    ...organicCorners,
+  },
   authors: {
     fontSize: 15,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  authorsSkeleton: {
+    marginTop: 4,
   },
   sectionTitle: {
     fontFamily: fonts.semibold,

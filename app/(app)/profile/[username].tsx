@@ -6,9 +6,11 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { ShelfGrid } from '../../../components/ShelfGrid';
+import { Skeleton, SkeletonText } from '../../../components/Skeleton';
 import { colors, fonts } from '../../../lib/theme';
 
 interface OtherProfile {
+  id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -24,48 +26,65 @@ interface ShelfItemRow {
 type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 
 export default function UserProfile() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const {
+    username,
+    displayName: placeholderDisplayName,
+    avatarUrl: placeholderAvatarUrl,
+  } = useLocalSearchParams<{ username: string; displayName?: string; avatarUrl?: string }>();
   const router = useRouter();
   const { session } = useAuth();
   const ownerId = session?.user?.id ?? null;
+  // The list/feed we tapped from already knew the name and avatar — render
+  // those immediately, and only skeleton the parts that need their own
+  // fetch (bio, friend/book counts, friendship status, shelf).
   const [profile, setProfile] = useState<OtherProfile | null>(null);
-  const [friendCount, setFriendCount] = useState(0);
-  const [items, setItems] = useState<ShelfItemRow[]>([]);
+  const [notFound, setNotFound] = useState(false);
+  const [friendCount, setFriendCount] = useState<number | null>(null);
+  const [items, setItems] = useState<ShelfItemRow[] | null>(null);
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
-  const [status, setStatus] = useState<FriendStatus>('none');
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<FriendStatus | null>(null);
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
+    if (!username) return;
 
-    if (ownerId && ownerId === id) {
+    const profileResult = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url, bio')
+      .eq('username', username)
+      .single();
+
+    if (profileResult.error || !profileResult.data) {
+      setNotFound(true);
+      return;
+    }
+
+    const targetId = profileResult.data.id;
+
+    if (ownerId && ownerId === targetId) {
       router.replace('/profile');
       return;
     }
 
-    const [profileResult, countResult, friendshipResult, itemsResult] = await Promise.all([
-      supabase.from('profiles').select('username, display_name, avatar_url, bio').eq('id', id).single(),
-      supabase.rpc('friend_count', { target: id }),
+    setProfile(profileResult.data);
+
+    const [countResult, friendshipResult, itemsResult] = await Promise.all([
+      supabase.rpc('friend_count', { target: targetId }),
       ownerId
         ? supabase
             .from('friendships')
             .select('id, requester_id, status')
-            .or(`and(requester_id.eq.${ownerId},addressee_id.eq.${id}),and(requester_id.eq.${id},addressee_id.eq.${ownerId})`)
+            .or(`and(requester_id.eq.${ownerId},addressee_id.eq.${targetId}),and(requester_id.eq.${targetId},addressee_id.eq.${ownerId})`)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       supabase
         .from('shelf_items')
         .select('id, status, book:books(id, title, cover_url)')
-        .eq('owner_id', id)
+        .eq('owner_id', targetId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false }),
     ]);
 
-    if (!profileResult.error && profileResult.data) {
-      setProfile(profileResult.data);
-    }
     if (!countResult.error && typeof countResult.data === 'number') {
       setFriendCount(countResult.data);
     }
@@ -86,9 +105,7 @@ export default function UserProfile() {
       setFriendshipId(null);
       setStatus('none');
     }
-
-    setLoading(false);
-  }, [id, router, ownerId]);
+  }, [username, router, ownerId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,11 +114,11 @@ export default function UserProfile() {
   );
 
   async function sendRequest() {
-    if (!ownerId || !id) return;
+    if (!ownerId || !profile) return;
     setActing(true);
     const { error } = await supabase
       .from('friendships')
-      .insert({ requester_id: ownerId, addressee_id: id });
+      .insert({ requester_id: ownerId, addressee_id: profile.id });
     setActing(false);
     if (error) {
       Alert.alert('Could not send request', error.message);
@@ -125,36 +142,71 @@ export default function UserProfile() {
     load();
   }
 
-  if (loading || !profile) {
-    return <View style={styles.container} />;
+  if (notFound) {
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.content, styles.emptyBody]}>Couldn't find that profile.</Text>
+      </View>
+    );
   }
 
-  const name = profile.display_name ?? profile.username;
+  // Name/avatar/@username are known the moment we land here — either from
+  // the full profile once it's loaded, or from what the list we tapped from
+  // already had. Everything else (bio, counts, status, shelf) waits on its
+  // own fetch and shows a skeleton until then.
+  const name = profile?.display_name ?? profile?.username ?? (placeholderDisplayName || username);
+  const avatarUrl = profile ? profile.avatar_url : placeholderAvatarUrl || null;
+  const detailsLoaded = status !== null;
   const isFriends = status === 'friends';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.topRow}>
-        <Avatar avatarUrl={profile.avatar_url} label={name} size={80} />
+        <Avatar avatarUrl={avatarUrl} label={name} size={80} />
         <View style={styles.stats}>
-          {isFriends && (
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>{items.length}</Text>
-              <Text style={styles.statLabel}>{items.length === 1 ? 'book' : 'books'}</Text>
-            </View>
+          {!detailsLoaded ? (
+            <>
+              <View style={styles.stat}>
+                <Skeleton width={28} height={18} style={styles.statSkeleton} />
+                <Skeleton width={40} height={12} style={styles.statSkeleton} />
+              </View>
+              <View style={styles.stat}>
+                <Skeleton width={28} height={18} style={styles.statSkeleton} />
+                <Skeleton width={40} height={12} style={styles.statSkeleton} />
+              </View>
+            </>
+          ) : (
+            <>
+              {isFriends && (
+                <View style={styles.stat}>
+                  <Text style={styles.statNumber}>{items?.length ?? 0}</Text>
+                  <Text style={styles.statLabel}>{items?.length === 1 ? 'book' : 'books'}</Text>
+                </View>
+              )}
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{friendCount ?? 0}</Text>
+                <Text style={styles.statLabel}>{friendCount === 1 ? 'friend' : 'friends'}</Text>
+              </View>
+            </>
           )}
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>{friendCount}</Text>
-            <Text style={styles.statLabel}>{friendCount === 1 ? 'friend' : 'friends'}</Text>
-          </View>
         </View>
       </View>
 
       <Text style={styles.name}>{name}</Text>
-      <Text style={styles.username}>@{profile.username}</Text>
-      {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+      <Text style={styles.username}>@{username}</Text>
+      {!detailsLoaded ? (
+        <SkeletonText lines={1} lineHeight={14} lastLineWidth="40%" style={styles.bioSkeleton} />
+      ) : (
+        profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>
+      )}
 
-      {!isFriends && (
+      {!detailsLoaded && (
+        <View style={styles.actions}>
+          <Skeleton height={44} borderRadius={999} />
+        </View>
+      )}
+
+      {detailsLoaded && !isFriends && (
         <View style={styles.actions}>
           {status === 'none' && <Button title="Add friend" onPress={sendRequest} loading={acting} />}
           {status === 'pending_sent' && <Button title="Request sent" variant="secondary" disabled />}
@@ -173,9 +225,9 @@ export default function UserProfile() {
         </View>
       )}
 
-      {isFriends && (
+      {detailsLoaded && isFriends && (
         <View style={styles.grid}>
-          <ShelfGrid items={items} emptyText="This shelf is empty so far." />
+          <ShelfGrid items={items ?? []} emptyText="This shelf is empty so far." />
         </View>
       )}
     </ScrollView>
@@ -198,6 +250,9 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     alignItems: 'center',
+  },
+  statSkeleton: {
+    marginTop: 4,
   },
   statNumber: {
     fontFamily: fonts.semibold,
@@ -227,6 +282,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 8,
   },
+  bioSkeleton: {
+    marginTop: 10,
+  },
   actions: {
     gap: 10,
     marginTop: 16,
@@ -239,5 +297,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textFaint,
     textAlign: 'center',
+  },
+  emptyBody: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
   },
 });

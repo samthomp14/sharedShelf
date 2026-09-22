@@ -6,7 +6,8 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
 import { ShelfGrid } from '../../../../components/ShelfGrid';
-import { colors, fonts } from '../../../../lib/theme';
+import { Skeleton } from '../../../../components/Skeleton';
+import { colors, fonts, organicCorners } from '../../../../lib/theme';
 
 interface OwnProfile {
   username: string;
@@ -66,8 +67,36 @@ export default function Profile() {
     }, [load])
   );
 
-  if (loading || !profile) {
-    return <View style={styles.container} />;
+  // Nothing to instant-paint from here (it's a tab, not tapped into from a
+  // list) — skeleton the whole layout until the first load lands. Once we
+  // have a profile, keep showing it on later refocuses instead of blanking
+  // out while a background refresh is in flight.
+  if (!profile) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.topRow}>
+          <Skeleton width={80} height={80} style={organicCorners} />
+          <View style={styles.stats}>
+            <View style={styles.stat}>
+              <Skeleton width={28} height={18} style={styles.statSkeleton} />
+              <Skeleton width={40} height={12} style={styles.statSkeleton} />
+            </View>
+            <View style={styles.stat}>
+              <Skeleton width={28} height={18} style={styles.statSkeleton} />
+              <Skeleton width={40} height={12} style={styles.statSkeleton} />
+            </View>
+          </View>
+        </View>
+        <Skeleton width="50%" height={19} />
+        <Skeleton width="30%" height={14} style={styles.usernameSkeleton} />
+        <Skeleton height={44} borderRadius={999} style={styles.editButton} />
+        <View style={styles.grid}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} width="31%" style={styles.gridTile} />
+          ))}
+        </View>
+      </ScrollView>
+    );
   }
 
   const name = profile.display_name ?? profile.username;
@@ -95,7 +124,16 @@ export default function Profile() {
       <Button
         title="Edit profile"
         variant="secondary"
-        onPress={() => router.push('/profile/settings')}
+        onPress={() =>
+          router.push({
+            pathname: '/profile/settings',
+            params: {
+              username: profile.username,
+              displayName: profile.display_name ?? '',
+              bio: profile.bio ?? '',
+            },
+          })
+        }
         style={styles.editButton}
       />
 
@@ -121,6 +159,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  statSkeleton: {
+    marginTop: 4,
+  },
   statNumber: {
     fontFamily: fonts.semibold,
     fontSize: 18,
@@ -143,6 +184,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  usernameSkeleton: {
+    marginTop: 6,
+  },
   bio: {
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -152,5 +196,15 @@ const styles = StyleSheet.create({
   editButton: {
     marginTop: 16,
     marginBottom: 24,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  gridTile: {
+    aspectRatio: 2 / 3,
+    ...organicCorners,
   },
 });

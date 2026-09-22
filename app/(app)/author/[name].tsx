@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
+import { Skeleton } from '../../../components/Skeleton';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface Book {
@@ -16,6 +17,7 @@ export default function AuthorBooks() {
   const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const authorName = name ? decodeURIComponent(name) : '';
 
@@ -32,6 +34,7 @@ export default function AuthorBooks() {
       setBooks(data);
     }
     setLoading(false);
+    setHasLoaded(true);
   }, [authorName]);
 
   useFocusEffect(
@@ -39,6 +42,23 @@ export default function AuthorBooks() {
       load();
     }, [load])
   );
+
+  // Name is already known from the route — render it immediately, and
+  // skeleton the grid until the first fetch for this author lands.
+  if (!hasLoaded) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.list}>
+          <Text style={styles.title}>{authorName}</Text>
+          <View style={styles.grid}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} width="31%" style={styles.gridTile} />
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -96,6 +116,17 @@ const styles = StyleSheet.create({
   gridRow: {
     justifyContent: 'flex-start',
     gap: 12,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  gridTile: {
+    aspectRatio: 2 / 3,
+    marginBottom: 20,
+    ...organicCorners,
   },
   card: {
     width: '31%',

@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
+import { profileHref } from '../../../lib/profileHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
 import { colors, fonts, inputStyle, radius } from '../../../lib/theme';
@@ -14,6 +15,7 @@ interface PersonResult {
   id: string;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
 }
 
 interface BookResult {
@@ -72,7 +74,7 @@ export default function Search() {
     const [peopleRes, booksRes, authorsRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, display_name')
+        .select('id, username, display_name, avatar_url')
         .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
         .neq('id', uid ?? '')
         .limit(15),
@@ -172,7 +174,10 @@ export default function Search() {
             <Text style={styles.sectionTitle}>People</Text>
             {people.map((item) => (
               <View key={item.id} style={styles.row}>
-                <Pressable style={{ flex: 1 }} onPress={() => router.push(`/profile/${item.id}`)}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => router.push(profileHref(item.username, item.display_name, item.avatar_url))}
+                >
                   <Text style={styles.name}>{item.display_name ?? item.username}</Text>
                   <Text style={styles.subtext}>@{item.username}</Text>
                 </Pressable>

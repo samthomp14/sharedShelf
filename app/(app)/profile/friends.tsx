@@ -2,9 +2,11 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { profileHref } from '../../../lib/profileHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
-import { colors, fonts } from '../../../lib/theme';
+import { Skeleton } from '../../../components/Skeleton';
+import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface FriendRow {
   friendId: string;
@@ -19,10 +21,12 @@ export default function Friends() {
   const uid = session?.user?.id ?? null;
   const [friends, setFriends] = useState<FriendRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(async () => {
     if (!uid) {
       setLoading(false);
+      setHasLoaded(true);
       return;
     }
     setLoading(true);
@@ -50,6 +54,7 @@ export default function Friends() {
     }
 
     setLoading(false);
+    setHasLoaded(true);
   }, [uid]);
 
   useFocusEffect(
@@ -57,6 +62,24 @@ export default function Friends() {
       load();
     }, [load])
   );
+
+  if (!hasLoaded) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.list}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <View key={i} style={styles.row}>
+              <Skeleton width={44} height={44} style={organicCorners} />
+              <View style={{ flex: 1 }}>
+                <Skeleton width="45%" height={16} />
+                <Skeleton width="30%" height={14} style={{ marginTop: 6 }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -75,7 +98,10 @@ export default function Friends() {
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => router.push(`/profile/${item.friendId}`)}>
+          <Pressable
+            style={styles.row}
+            onPress={() => router.push(profileHref(item.username, item.displayName, item.avatarUrl))}
+          >
             <Avatar avatarUrl={item.avatarUrl} label={item.displayName ?? item.username} size={44} />
             <View>
               <Text style={styles.name}>{item.displayName ?? item.username}</Text>

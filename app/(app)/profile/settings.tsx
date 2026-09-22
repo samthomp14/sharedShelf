@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -17,26 +18,27 @@ function friendlyError(message: string): string {
 export default function ProfileSettings() {
   const { session } = useAuth();
   const uid = session?.user?.id ?? null;
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
-  const [loading, setLoading] = useState(true);
+  // The profile tab we came from already had this — seed the form with it
+  // instead of blanking out while we re-fetch to confirm it's current.
+  const params = useLocalSearchParams<{ username?: string; displayName?: string; bio?: string }>();
+  const [username, setUsername] = useState(params.username ?? '');
+  const [email, setEmail] = useState(session?.user?.email ?? '');
+  const [displayName, setDisplayName] = useState(params.displayName ?? '');
+  const [bio, setBio] = useState(params.bio ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // Once the user starts editing, stop letting the background refresh
+  // overwrite what they've typed.
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     load();
   }, [uid]);
 
   async function load() {
-    setLoading(true);
     setEmail(session?.user?.email ?? '');
-    if (!uid) {
-      setLoading(false);
-      return;
-    }
+    if (!uid) return;
 
     const { data } = await supabase
       .from('profiles')
@@ -44,12 +46,11 @@ export default function ProfileSettings() {
       .eq('id', uid)
       .single();
 
-    if (data) {
+    if (data && !dirty) {
       setUsername(data.username);
       setDisplayName(data.display_name ?? '');
       setBio(data.bio ?? '');
     }
-    setLoading(false);
   }
 
   async function save() {
@@ -83,10 +84,6 @@ export default function ProfileSettings() {
     await supabase.auth.signOut();
   }
 
-  if (loading) {
-    return <View style={styles.container} />;
-  }
-
   return (
     <View style={styles.container}>
       <View>
@@ -99,6 +96,7 @@ export default function ProfileSettings() {
           onChangeText={(text) => {
             setUsername(text);
             setSaved(false);
+            setDirty(true);
           }}
           autoCapitalize="none"
         />
@@ -112,6 +110,7 @@ export default function ProfileSettings() {
           onChangeText={(text) => {
             setDisplayName(text);
             setSaved(false);
+            setDirty(true);
           }}
         />
 
@@ -124,6 +123,7 @@ export default function ProfileSettings() {
           onChangeText={(text) => {
             setBio(text);
             setSaved(false);
+            setDirty(true);
           }}
           multiline
         />
