@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   Alert,
@@ -57,6 +58,7 @@ function toTitleCase(str: string): string {
 
 export default function AddBook() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const [isbn, setIsbn] = useState('');
   const [title, setTitle] = useState('');
@@ -337,7 +339,7 @@ export default function AddBook() {
           <View style={styles.viewfinderWrap} pointerEvents="none">
             <View style={styles.viewfinder} />
           </View>
-          <View style={styles.scannerOverlay}>
+          <View style={[styles.scannerOverlay, { paddingBottom: 24 + insets.bottom }]}>
             <Text style={styles.scannerHint}>Line the barcode up in the box</Text>
             <Pressable style={styles.scannerClose} onPress={() => setScanning(false)}>
               <Text style={styles.scannerCloseText}>Cancel</Text>

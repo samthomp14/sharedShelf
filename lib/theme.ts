@@ -39,6 +39,11 @@ export const spacing = {
   xl: 32,
 };
 
+// Height of the navigator header's content row, excluding the status-bar
+// inset above it. React Navigation's web default is 64, which leaves a
+// ~20px gap above the title; 52 keeps it ~14px below the status bar.
+export const headerHeight = 52;
+
 // Uniform corner radii for controls (buttons, inputs, filter pills, tags).
 export const radius = {
   sm: 8,

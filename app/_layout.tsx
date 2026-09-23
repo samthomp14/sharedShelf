@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -21,6 +21,20 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { colors } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync();
+
+// React Navigation paints screens and headers with its theme's grey
+// `background` / white `card` wherever a screen doesn't set its own color.
+// Match the page so no white band or seam shows, e.g. behind the status bar.
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.background,
+    card: colors.background,
+    text: colors.text,
+    border: colors.border,
+  },
+};
 
 function RootNavigator() {
   const { session, initializing } = useAuth();
@@ -69,10 +83,12 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <RootNavigator />
-          <StatusBar style="dark" />
-        </AuthProvider>
+        <ThemeProvider value={navigationTheme}>
+          <AuthProvider>
+            <RootNavigator />
+            <StatusBar style="dark" />
+          </AuthProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
