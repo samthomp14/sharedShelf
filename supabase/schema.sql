@@ -85,10 +85,9 @@ create policy "books are readable by any authenticated user"
   to authenticated
   using (true);
 
-create policy "authenticated users can add books to the catalog"
-  on public.books for insert
-  to authenticated
-  with check (true);
+-- No insert/update/delete policies: books are only created through
+-- add_book_to_shelf (security definer, below), which normalizes the ISBN
+-- and validates the row. Catalog rows are never edited by clients.
 
 create index books_title_trgm_idx on public.books using gin (title gin_trgm_ops);
 
