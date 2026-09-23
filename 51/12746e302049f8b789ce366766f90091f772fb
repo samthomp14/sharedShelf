@@ -1,0 +1,28 @@
+public/index.html
+  s_fdf5fdf1e96fc0::t_171eb536652060 21,25
+assets/og-image.html
+  s_fdf5fdf1e96fc0::t_171eb536652060 27
+public/manifest.webmanifest
+  s_fdf5fdf1e96fc0::t_171eb536652060 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5112746e302049f8b789ce366766f90091f772fb",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
