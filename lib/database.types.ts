@@ -6,6 +6,16 @@ export type FriendshipStatus = 'pending' | 'accepted';
 export type ShelfItemStatus = 'available' | 'requested' | 'on_loan';
 export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 
+// Row shape returned by search_catalog / lookup_isbn.
+export interface CatalogBookRow {
+  id: string;
+  isbn: string | null;
+  title: string;
+  authors: string[];
+  cover_url: string | null;
+  shelf_item_id: string | null;
+}
+
 export interface Database {
   public: {
     Views: Record<string, never>;
@@ -17,6 +27,29 @@ export interface Database {
       friend_count: {
         Args: { target: string };
         Returns: number;
+      };
+      normalize_isbn: {
+        Args: { raw: string };
+        Returns: string | null;
+      };
+      add_book_to_shelf: {
+        Args: {
+          p_book_id?: string;
+          p_isbn?: string;
+          p_title?: string;
+          p_authors?: string[];
+          p_cover_url?: string;
+          p_source?: string;
+        };
+        Returns: { book_id: string; shelf_item_id: string; already_on_shelf: boolean }[];
+      };
+      search_catalog: {
+        Args: { q: string };
+        Returns: CatalogBookRow[];
+      };
+      lookup_isbn: {
+        Args: { p_isbn: string };
+        Returns: CatalogBookRow[];
       };
     };
     Tables: {

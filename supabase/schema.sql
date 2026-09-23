@@ -73,7 +73,9 @@ create table public.books (
   authors text[] not null default '{}',
   cover_url text,
   source text, -- e.g. 'open_library', 'google_books', 'manual'
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Always stored as a canonical ISBN-13; see normalize_isbn below.
+  constraint books_isbn_13_check check (isbn is null or isbn ~ '^97[89][0-9]{10}$')
 );
 
 alter table public.books enable row level security;
@@ -262,7 +264,8 @@ create table public.shelf_items (
   visibility text not null default 'friends' check (visibility in ('friends', 'private')),
   group_id uuid references public.shelf_groups (id) on delete set null,
   sort_order integer not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint shelf_items_owner_book_key unique (owner_id, book_id)
 );
 
 create index shelf_items_owner_id_idx on public.shelf_items (owner_id);
@@ -287,6 +290,211 @@ create policy "owners manage their own shelf items"
   to authenticated
   using ((select auth.uid()) = owner_id)
   with check ((select auth.uid()) = owner_id);
+
+-- ============================================================
+-- Add-book RPCs: our catalog is always checked first; the client
+-- only calls Open Library / Google Books on a miss. Every add goes
+-- through add_book_to_shelf so ISBNs are normalized and the
+-- catalog row + shelf item land in one transaction.
+-- ============================================================
+
+-- Canonical ISBN-13 (978/979) from any ISBN-10/13 spelling, or null if invalid.
+create function public.normalize_isbn(raw text)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  s text;
+  core text;
+  total int := 0;
+  d int;
+begin
+  if raw is null then
+    return null;
+  end if;
+  s := upper(regexp_replace(raw, '[^0-9Xx]', '', 'g'));
+
+  if length(s) = 10 then
+    if s !~ '^[0-9]{9}[0-9X]$' then
+      return null;
+    end if;
+    -- ISBN-10: weights 10..1, sum must be divisible by 11 (X = 10).
+    for i in 1..10 loop
+      d := case when substr(s, i, 1) = 'X' then 10 else substr(s, i, 1)::int end;
+      total := total + d * (11 - i);
+    end loop;
+    if total % 11 <> 0 then
+      return null;
+    end if;
+    core := '978' || substr(s, 1, 9);
+  elsif length(s) = 13 then
+    if s !~ '^97[89][0-9]{10}$' then
+      return null;
+    end if;
+    core := substr(s, 1, 12);
+  else
+    return null;
+  end if;
+
+  -- EAN-13 check digit: weights alternate 1,3.
+  total := 0;
+  for i in 1..12 loop
+    total := total + substr(core, i, 1)::int * (case when i % 2 = 1 then 1 else 3 end);
+  end loop;
+  d := (10 - total % 10) % 10;
+
+  if length(s) = 13 and substr(s, 13, 1)::int <> d then
+    return null;
+  end if;
+  return core || d::text;
+end;
+$$;
+
+-- The one way the app adds a book: find-or-create the catalog row and put it
+-- on the caller's shelf in a single transaction.
+create function public.add_book_to_shelf(
+  p_book_id uuid default null,
+  p_isbn text default null,
+  p_title text default null,
+  p_authors text[] default null,
+  p_cover_url text default null,
+  p_source text default null
+)
+returns table (book_id uuid, shelf_item_id uuid, already_on_shelf boolean)
+language plpgsql
+security definer set search_path = ''
+as $$
+#variable_conflict use_column
+declare
+  v_uid uuid := auth.uid();
+  v_book uuid;
+  v_isbn text;
+  v_title text;
+  v_authors text[];
+  v_item uuid;
+  v_already boolean := false;
+begin
+  if v_uid is null then
+    raise exception 'You need to be signed in.' using errcode = '42501';
+  end if;
+
+  if p_book_id is not null then
+    select b.id into v_book from public.books b where b.id = p_book_id;
+    if v_book is null then
+      raise exception 'Book not found.' using errcode = 'P0002';
+    end if;
+  else
+    if nullif(btrim(p_isbn), '') is not null then
+      v_isbn := public.normalize_isbn(p_isbn);
+      if v_isbn is null then
+        raise exception 'That ISBN isn''t valid.' using errcode = '22023';
+      end if;
+      -- An existing catalog row wins; the details sent in are ignored.
+      select b.id into v_book from public.books b where b.isbn = v_isbn;
+    end if;
+
+    if v_book is null then
+      v_title := btrim(regexp_replace(coalesce(p_title, ''), '\s+', ' ', 'g'));
+      if v_title = '' then
+        raise exception 'Title is required.' using errcode = '22023';
+      end if;
+
+      select coalesce(array_agg(a order by ord), '{}') into v_authors
+      from (
+        select distinct on (lower(a)) a, ord
+        from (
+          select btrim(regexp_replace(x, '\s+', ' ', 'g')) as a, ord
+          from unnest(coalesce(p_authors, '{}'::text[])) with ordinality as u (x, ord)
+        ) cleaned
+        where a <> ''
+        order by lower(a), ord
+      ) deduped;
+
+      if p_source is null or p_source not in ('manual', 'open_library', 'google_books') then
+        raise exception 'Invalid book source.' using errcode = '22023';
+      end if;
+      if p_cover_url is not null and p_cover_url !~ '^https://' then
+        raise exception 'Cover URL must be https.' using errcode = '22023';
+      end if;
+
+      begin
+        insert into public.books (isbn, title, authors, cover_url, source)
+        values (v_isbn, v_title, v_authors, p_cover_url, p_source)
+        returning id into v_book;
+      exception when unique_violation then
+        -- Someone added the same ISBN a moment ago.
+        select b.id into v_book from public.books b where b.isbn = v_isbn;
+      end;
+    end if;
+  end if;
+
+  insert into public.shelf_items (owner_id, book_id)
+  values (v_uid, v_book)
+  on conflict on constraint shelf_items_owner_book_key do nothing
+  returning id into v_item;
+
+  if v_item is null then
+    select s.id into v_item from public.shelf_items s
+    where s.owner_id = v_uid and s.book_id = v_book;
+    v_already := true;
+  end if;
+
+  return query select v_book, v_item, v_already;
+end;
+$$;
+
+revoke execute on function public.add_book_to_shelf(uuid, text, text, text[], text, text) from public, anon;
+grant execute on function public.add_book_to_shelf(uuid, text, text, text[], text, text) to authenticated;
+
+-- Catalog search by title or author, with the caller's own shelf item (if any).
+create function public.search_catalog(q text)
+returns table (id uuid, isbn text, title text, authors text[], cover_url text, shelf_item_id uuid)
+language sql
+stable
+set search_path = public, extensions
+as $$
+  with term as (
+    select btrim(q) as t,
+           '%' || replace(replace(replace(btrim(q), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pat
+  )
+  select b.id, b.isbn, b.title, b.authors, b.cover_url, s.id
+  from term, public.books b
+  left join public.shelf_items s
+    on s.book_id = b.id and s.owner_id = (select auth.uid())
+  where length(term.t) >= 2
+    and (
+      b.title ilike term.pat
+      or b.title % term.t
+      or exists (
+        select 1 from public.book_authors ba
+        where ba.book_id = b.id and ba.author ilike term.pat
+      )
+    )
+  order by greatest(similarity(b.title, term.t), word_similarity(term.t, b.title)) desc, b.title
+  limit 20;
+$$;
+
+revoke execute on function public.search_catalog(text) from public, anon;
+grant execute on function public.search_catalog(text) to authenticated;
+
+-- Exact ISBN lookup in our catalog (any ISBN-10/13 spelling).
+create function public.lookup_isbn(p_isbn text)
+returns table (id uuid, isbn text, title text, authors text[], cover_url text, shelf_item_id uuid)
+language sql
+stable
+set search_path = ''
+as $$
+  select b.id, b.isbn, b.title, b.authors, b.cover_url, s.id
+  from public.books b
+  left join public.shelf_items s
+    on s.book_id = b.id and s.owner_id = (select auth.uid())
+  where b.isbn = public.normalize_isbn(p_isbn);
+$$;
+
+revoke execute on function public.lookup_isbn(text) from public, anon;
+grant execute on function public.lookup_isbn(text) to authenticated;
 
 -- ============================================================
 -- loan_requests: a friend asking to borrow a shelf item
