@@ -159,7 +159,7 @@ export default function Search() {
         <Button title="Search" variant="secondary" onPress={() => search(query.trim())} loading={searching} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.results}>
+      <ScrollView style={styles.resultsScroll} contentContainerStyle={styles.results}>
         {!searched && (
           <Text style={styles.emptyText}>
             Search for a username, book title, or author.
@@ -248,7 +248,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 16 },
   searchRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   searchInput: { flex: 1, marginBottom: 0 },
-  results: { paddingTop: 16, flexGrow: 1 },
+  // Full-bleed scroll area with the padding inside it: a ScrollView clips at its
+  // edges, which sliced the shadow off the right-aligned "Add" buttons.
+  resultsScroll: { marginHorizontal: -16 },
+  results: { paddingTop: 16, paddingHorizontal: 16, flexGrow: 1 },
   section: { marginBottom: 20 },
   sectionTitle: {
     fontFamily: fonts.semibold,
