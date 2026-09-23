@@ -314,11 +314,15 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
           <View style={styles.sheetBlock}>
             <Text style={styles.sheetTitle}>Couldn't look that up</Text>
             <Text style={styles.sheetText}>
-              Check your connection and try again. (ISBN {sheet.isbn})
+              The book lookup didn't respond. Try again, or enter it manually. (ISBN {sheet.isbn})
             </Text>
             <View style={styles.sheetActions}>
               <Button title="Retry" onPress={() => runLookup(sheet.isbn)} style={styles.sheetPrimary} />
-              <Button title="Skip" variant="secondary" onPress={() => dismissSheet(sheet.isbn)} />
+              <Button
+                title="Enter manually"
+                variant="secondary"
+                onPress={() => handleManualEntry(sheet.isbn)}
+              />
             </View>
           </View>
         );

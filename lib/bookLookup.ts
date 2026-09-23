@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { normalizeIsbn } from './isbn';
+import { log } from './log';
 
 // Book lookup for the add-book flow. Our own catalog is always checked first;
 // Open Library and then Google Books are fallbacks only, and anything we take
@@ -113,9 +114,14 @@ function toExternal(
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  if (!res.ok) throw new Error(`${new URL(url).host} responded ${res.status}`);
   return (await res.json()) as T;
 }
+
+// Google Books needs an API key: its keyless quota is shared by everyone and
+// is usually exhausted (429). Without a key we skip it and rely on Open Library.
+const GOOGLE_BOOKS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY;
+const googleKeyParam = GOOGLE_BOOKS_API_KEY ? `&key=${encodeURIComponent(GOOGLE_BOOKS_API_KEY)}` : '';
 
 // ---------------------------------------------------------------------------
 // Our catalog
@@ -143,18 +149,15 @@ function toCatalogBook(row: CatalogRow): CatalogBook {
 
 export async function searchCatalog(q: string): Promise<CatalogBook[]> {
   const { data, error } = await supabase.rpc('search_catalog', { q: q.trim() });
-  if (error) throw new Error(error.message);
+  if (error) {
+    log.error('book_lookup.search_catalog_failed', { q, error: error.message });
+    throw new Error(error.message);
+  }
   return ((data ?? []) as CatalogRow[]).map(toCatalogBook);
 }
 
 // ---------------------------------------------------------------------------
 // External sources
-
-interface OpenLibraryDataBook {
-  title?: string;
-  authors?: { name?: string }[];
-  cover?: { small?: string; medium?: string; large?: string };
-}
 
 interface OpenLibrarySearchDoc {
   title?: string;
@@ -176,17 +179,19 @@ interface GoogleVolumesResponse {
   items?: GoogleVolume[];
 }
 
+// Open Library's old /api/books?bibkeys= endpoint now 404s for every ISBN;
+// search.json with an isbn filter is the working equivalent.
 async function openLibraryByIsbn(isbn: string): Promise<ExternalBook | null> {
-  const json = await fetchJson<Record<string, OpenLibraryDataBook>>(
-    `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&jscmd=data&format=json`
+  const json = await fetchJson<{ docs?: OpenLibrarySearchDoc[] }>(
+    `https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}&fields=title,author_name,cover_i&limit=1`
   );
-  const found = json[`ISBN:${isbn}`];
-  if (!found) return null;
+  const doc = json.docs?.[0];
+  if (!doc) return null;
   return toExternal(
     isbn,
-    found.title,
-    found.authors?.map((a) => a.name),
-    found.cover?.medium ?? found.cover?.small,
+    doc.title,
+    doc.author_name,
+    doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
     'open_library'
   );
 }
@@ -211,7 +216,7 @@ function fromGoogle(volume: GoogleVolume, isbn: string | null): ExternalBook | n
 
 async function googleBooksByIsbn(isbn: string): Promise<ExternalBook | null> {
   const json = await fetchJson<GoogleVolumesResponse>(
-    `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`
+    `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}${googleKeyParam}`
   );
   // We asked for this exact ISBN, so tag the result with it.
   for (const volume of json.items ?? []) {
@@ -257,35 +262,48 @@ async function openLibrarySearch(q: string): Promise<ExternalBook[]> {
 
 async function googleBooksSearch(q: string): Promise<ExternalBook[]> {
   const json = await fetchJson<GoogleVolumesResponse>(
-    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books`
+    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books${googleKeyParam}`
   );
   return (json.items ?? [])
     .map((volume) => fromGoogle(volume, googleIsbn(volume)))
     .filter((b): b is ExternalBook => b !== null);
 }
 
+interface Source<T> {
+  name: string;
+  run: () => Promise<T>;
+}
+
 // Runs each source in order until one returns something. Throws only if every
 // source errored — a clean "nothing found" from any source is not an error.
+// Each failure is logged, so a broken or rate-limited API shows up in client_logs.
 async function firstHit<T>(
-  sources: (() => Promise<T>)[],
+  op: string,
+  sources: Source<T>[],
   isHit: (result: T) => boolean,
   empty: T
 ): Promise<T> {
-  let failures = 0;
+  const failures: { source: string; error: string }[] = [];
   let lastError: unknown;
   for (const source of sources) {
     try {
-      const result = await source();
+      const result = await source.run();
       if (isHit(result)) return result;
     } catch (e) {
-      failures++;
       lastError = e;
+      failures.push({ source: source.name, error: e instanceof Error ? e.message : String(e) });
+      log.warn('book_lookup.source_failed', { op, source: source.name, error: e });
     }
   }
-  if (failures === sources.length) {
+  if (sources.length > 0 && failures.length === sources.length) {
+    log.error('book_lookup.all_sources_failed', { op, failures });
     throw lastError instanceof Error ? lastError : new Error('Book lookup failed');
   }
   return empty;
+}
+
+function withGoogle<T>(openLibrary: Source<T>, google: Source<T>): Source<T>[] {
+  return GOOGLE_BOOKS_API_KEY ? [openLibrary, google] : [openLibrary];
 }
 
 // ---------------------------------------------------------------------------
@@ -296,12 +314,19 @@ export async function lookupIsbn(isbn: string): Promise<IsbnLookupResult> {
   if (!normalized) return { kind: 'not_found' };
 
   const { data, error } = await supabase.rpc('lookup_isbn', { p_isbn: normalized });
-  if (error) throw new Error(error.message);
+  if (error) {
+    log.error('book_lookup.lookup_isbn_failed', { isbn: normalized, error: error.message });
+    throw new Error(error.message);
+  }
   const row = ((data ?? []) as CatalogRow[])[0];
   if (row) return { kind: 'catalog', book: toCatalogBook(row) };
 
   const book = await firstHit<ExternalBook | null>(
-    [() => openLibraryByIsbn(normalized), () => googleBooksByIsbn(normalized)],
+    `isbn:${normalized}`,
+    withGoogle(
+      { name: 'open_library', run: () => openLibraryByIsbn(normalized) },
+      { name: 'google_books', run: () => googleBooksByIsbn(normalized) }
+    ),
     (b) => b !== null,
     null
   );
@@ -315,7 +340,11 @@ export async function searchExternal(q: string): Promise<ExternalBook[]> {
   if (query.length < 2) return [];
 
   const results = await firstHit<ExternalBook[]>(
-    [() => openLibrarySearch(query), () => googleBooksSearch(query)],
+    `search:${query}`,
+    withGoogle(
+      { name: 'open_library', run: () => openLibrarySearch(query) },
+      { name: 'google_books', run: () => googleBooksSearch(query) }
+    ),
     (r) => r.length > 0,
     []
   );
@@ -362,7 +391,10 @@ export async function addToShelf(input: AddToShelfInput): Promise<AddToShelfResu
           p_source: input.source,
         };
   const { data, error } = await supabase.rpc('add_book_to_shelf', args);
-  if (error) throw new Error(error.message);
+  if (error) {
+    log.error('shelf.add_failed', { args, error: error.message });
+    throw new Error(error.message);
+  }
   const row = ((data ?? []) as AddBookRow[])[0];
   if (!row) throw new Error('Could not add book to your shelf');
   return {
@@ -374,5 +406,8 @@ export async function addToShelf(input: AddToShelfInput): Promise<AddToShelfResu
 
 export async function removeFromShelf(shelfItemId: string): Promise<void> {
   const { error } = await supabase.from('shelf_items').delete().eq('id', shelfItemId);
-  if (error) throw new Error(error.message);
+  if (error) {
+    log.error('shelf.remove_failed', { shelfItemId, error: error.message });
+    throw new Error(error.message);
+  }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { BarcodeDetector, prepareZXingModule } from 'barcode-detector/ponyfill';
+import { log } from '../../lib/log';
 import type { BarcodeCameraProps } from './BarcodeCamera';
 
 // Our own web scanner instead of expo-camera's: iOS Safari has no native
@@ -28,9 +29,12 @@ export function BarcodeCamera({ onScanned, onError }: BarcodeCameraProps) {
     let cancelled = false;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let reportedDetectError = false;
 
     // Start fetching the ZXing WASM now, in parallel with the camera starting.
-    prepareZXingModule({ fireImmediately: true }).catch(() => {});
+    prepareZXingModule({ fireImmediately: true }).catch((error) =>
+      log.error('scanner.decoder_load_failed', { error })
+    );
     const detector = new BarcodeDetector({ formats: FORMATS });
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -58,8 +62,13 @@ export function BarcodeCamera({ onScanned, onError }: BarcodeCameraProps) {
           if (!cancelled) {
             for (const result of results) onScannedRef.current(result.rawValue);
           }
-        } catch {
-          // A failed frame (e.g. WASM still loading) — just try the next one.
+        } catch (error) {
+          // A failed frame (e.g. WASM still loading) — just try the next one,
+          // but report the first failure of each session so a broken decoder shows up.
+          if (!reportedDetectError) {
+            reportedDetectError = true;
+            log.warn('scanner.detect_failed', { error });
+          }
         }
       }
       if (!cancelled) timer = setTimeout(scanFrame, SCAN_INTERVAL_MS);
@@ -75,7 +84,8 @@ export function BarcodeCamera({ onScanned, onError }: BarcodeCameraProps) {
             height: { ideal: 1080 },
           },
         });
-      } catch {
+      } catch (error) {
+        log.error('scanner.camera_failed', { error });
         if (!cancelled) onErrorRef.current();
         return;
       }

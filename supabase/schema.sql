@@ -643,3 +643,29 @@ create trigger on_loan_returned
   for each row execute procedure public.handle_loan_returned();
 
 revoke execute on function public.handle_loan_returned() from public, anon, authenticated;
+
+-- ============================================================
+-- client_logs: errors reported by the app (mainly the iPhone
+-- home-screen web app, where there's no console to look at).
+-- Clients can only insert their own rows; nobody can read them
+-- through the API — query them from the dashboard.
+-- ============================================================
+create table public.client_logs (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  user_id uuid default auth.uid() references public.profiles (id) on delete set null,
+  level text not null check (level in ('info', 'warn', 'error')),
+  event text not null check (length(event) <= 100),
+  detail jsonb check (detail is null or length(detail::text) <= 4000),
+  user_agent text check (user_agent is null or length(user_agent) <= 500)
+);
+
+create index client_logs_created_at_idx on public.client_logs (created_at desc);
+create index client_logs_user_id_idx on public.client_logs (user_id);
+
+alter table public.client_logs enable row level security;
+
+create policy "users can report their own client logs"
+  on public.client_logs for insert
+  to authenticated
+  with check (user_id = (select auth.uid()));

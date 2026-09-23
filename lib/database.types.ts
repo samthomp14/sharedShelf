@@ -2,6 +2,8 @@
 // Once the project is linked to the Supabase CLI, regenerate with:
 //   supabase gen types typescript --linked > lib/database.types.ts
 
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 export type FriendshipStatus = 'pending' | 'accepted';
 export type ShelfItemStatus = 'available' | 'requested' | 'on_loan';
 export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
@@ -93,6 +95,25 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['books']['Insert']>;
+        Relationships: [];
+      };
+      client_logs: {
+        Row: {
+          id: number;
+          created_at: string;
+          user_id: string | null;
+          level: 'info' | 'warn' | 'error';
+          event: string;
+          detail: Json | null;
+          user_agent: string | null;
+        };
+        Insert: {
+          level: 'info' | 'warn' | 'error';
+          event: string;
+          detail?: Json | null;
+          user_agent?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['client_logs']['Insert']>;
         Relationships: [];
       };
       book_authors: {
