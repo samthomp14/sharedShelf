@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabase';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
+import { ShareAppButton } from '../../../../components/ShareAppButton';
 import { ShelfGrid } from '../../../../components/ShelfGrid';
 import { Skeleton } from '../../../../components/Skeleton';
 import { RefreshControl } from '../../../../components/RefreshControl';
@@ -93,7 +94,10 @@ export default function Profile() {
         </View>
         <Skeleton width="50%" height={19} />
         <Skeleton width="30%" height={14} style={styles.usernameSkeleton} />
-        <Skeleton height={44} borderRadius={999} style={styles.editButton} />
+        <View style={styles.actions}>
+          <Skeleton height={44} borderRadius={999} style={styles.action} />
+          <Skeleton height={44} borderRadius={999} style={styles.action} />
+        </View>
         <View style={styles.grid}>
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} width="31%" style={styles.gridTile} />
@@ -129,21 +133,24 @@ export default function Profile() {
       <Text style={styles.username}>@{profile.username}</Text>
       {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
-      <Button
-        title="Edit profile"
-        variant="secondary"
-        onPress={() =>
-          router.push({
-            pathname: '/profile/settings',
-            params: {
-              username: profile.username,
-              displayName: profile.display_name ?? '',
-              bio: profile.bio ?? '',
-            },
-          })
-        }
-        style={styles.editButton}
-      />
+      <View style={styles.actions}>
+        <Button
+          title="Edit profile"
+          variant="secondary"
+          onPress={() =>
+            router.push({
+              pathname: '/profile/settings',
+              params: {
+                username: profile.username,
+                displayName: profile.display_name ?? '',
+                bio: profile.bio ?? '',
+              },
+            })
+          }
+          style={styles.action}
+        />
+        <ShareAppButton style={styles.action} />
+      </View>
 
       <ShelfGrid items={items} emptyText="Your shelf is empty. Add a book to get started." />
     </ScrollView>
@@ -201,9 +208,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 8,
   },
-  editButton: {
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     marginTop: 16,
     marginBottom: 24,
+  },
+  action: {
+    flex: 1,
   },
   grid: {
     flexDirection: 'row',

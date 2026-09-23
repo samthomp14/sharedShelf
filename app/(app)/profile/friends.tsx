@@ -7,6 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Skeleton } from '../../../components/Skeleton';
 import { RefreshControl } from '../../../components/RefreshControl';
+import { ShareAppButton } from '../../../components/ShareAppButton';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
@@ -92,11 +93,19 @@ export default function Friends() {
         keyExtractor={(item) => item.friendId}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListHeaderComponent={
+          friends.length > 0 ? (
+            <ShareAppButton title="Invite friends to sharedShelf" variant="secondary" style={styles.invite} />
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No friends yet</Text>
-              <Text style={styles.emptyBody}>Search for a username to send a friend request.</Text>
+              <Text style={styles.emptyBody}>
+                Invite friends to sharedShelf, or search for a username to send a friend request.
+              </Text>
+              <ShareAppButton style={styles.emptyInvite} />
             </View>
           ) : null
         }
@@ -130,6 +139,7 @@ const styles = StyleSheet.create({
   },
   name: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   username: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
+  invite: { marginBottom: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
   emptyBody: {
@@ -139,4 +149,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
+  emptyInvite: { marginTop: 20, alignSelf: 'stretch', paddingHorizontal: 32 },
 });

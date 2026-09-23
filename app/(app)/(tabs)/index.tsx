@@ -10,6 +10,7 @@ import { Button } from '../../../components/Button';
 import { InlineLink } from '../../../components/InlineLink';
 import { InstallBanner } from '../../../components/InstallBanner';
 import { RefreshControl } from '../../../components/RefreshControl';
+import { ShareAppButton } from '../../../components/ShareAppButton';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { timeAgo } from '../../../lib/time';
 import { colors, fonts, radius } from '../../../lib/theme';
@@ -400,6 +401,7 @@ export default function Activity() {
             <Text style={styles.emptyBody}>
               Add friends and books to start seeing activity.
             </Text>
+            <ShareAppButton style={styles.emptyInvite} />
           </View>
         ) : (
           events.map((event) => {
@@ -615,4 +617,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
+  emptyInvite: { marginTop: 20, alignSelf: 'stretch', paddingHorizontal: 32 },
 });

@@ -1,13 +1,16 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type PressableProps } from 'react-native';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type PressableProps } from 'react-native';
 import { colors, fonts, radius, shadow } from '../lib/theme';
 
 interface ButtonProps extends PressableProps {
   title: string;
   variant?: 'primary' | 'secondary';
   loading?: boolean;
+  // Optional glyph shown before the title.
+  icon?: ReactNode;
 }
 
-export function Button({ title, variant = 'primary', loading, disabled, style, ...props }: ButtonProps) {
+export function Button({ title, variant = 'primary', loading, icon, disabled, style, ...props }: ButtonProps) {
   const isPrimary = variant === 'primary';
   return (
     <Pressable
@@ -22,9 +25,12 @@ export function Button({ title, variant = 'primary', loading, disabled, style, .
       {loading ? (
         <ActivityIndicator color={isPrimary ? colors.background : colors.text} />
       ) : (
-        <Text style={[styles.text, isPrimary ? styles.primaryText : styles.secondaryText]}>
-          {title}
-        </Text>
+        <View style={styles.content}>
+          {icon}
+          <Text style={[styles.text, isPrimary ? styles.primaryText : styles.secondaryText]}>
+            {title}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -46,6 +52,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   text: {
     fontFamily: fonts.semibold,

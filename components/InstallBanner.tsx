@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { isIOSSafari, isStandalone, useInstallPrompt } from '../lib/pwa';
 import { colors, fonts, radius } from '../lib/theme';
 import { Button } from './Button';
+import { ShareGlyph } from './ShareGlyph';
 
 const DISMISS_KEY = 'sharedShelf.installBanner.dismissedAt';
 const DISMISS_FOR_MS = 30 * 24 * 60 * 60 * 1000;
@@ -23,18 +24,6 @@ function rememberDismissal() {
   } catch {
     // Storage blocked (private mode etc.) — dismissal just won't persist.
   }
-}
-
-// iOS's share icon — a tray with an arrow out of the top — drawn with Views
-// so it sits inline with the copy without pulling in an icon library.
-function ShareGlyph() {
-  return (
-    <View style={glyph.wrap} accessibilityLabel="Share">
-      <View style={glyph.arrowHead} />
-      <View style={glyph.shaft} />
-      <View style={glyph.tray} />
-    </View>
-  );
 }
 
 // Nudges signed-in web users to add the app to their home screen. Web only,
@@ -146,40 +135,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 20,
     color: colors.textMuted,
-  },
-});
-
-const glyph = StyleSheet.create({
-  wrap: {
-    width: 14,
-    height: 17,
-    alignItems: 'center',
-  },
-  arrowHead: {
-    width: 6,
-    height: 6,
-    borderTopWidth: 1.5,
-    borderLeftWidth: 1.5,
-    borderColor: colors.accent,
-    transform: [{ rotate: '45deg' }],
-    marginTop: 1,
-  },
-  shaft: {
-    position: 'absolute',
-    top: 1.5,
-    width: 1.5,
-    height: 9,
-    backgroundColor: colors.accent,
-  },
-  tray: {
-    position: 'absolute',
-    bottom: 0,
-    width: 13,
-    height: 9,
-    borderWidth: 1.5,
-    borderTopWidth: 0,
-    borderColor: colors.accent,
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
   },
 });
