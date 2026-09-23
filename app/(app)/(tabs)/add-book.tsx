@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { ToastProvider, useToast } from '../../../components/Toast';
+import { ManualForm } from '../../../components/addBook/ManualForm';
 import { ScannerModal } from '../../../components/addBook/ScannerModal';
-import { addToShelf } from '../../../lib/bookLookup';
-import { normalizeIsbn } from '../../../lib/isbn';
-import { colors, fonts, inputStyle } from '../../../lib/theme';
+import { SearchPanel, type ManualPrefill } from '../../../components/addBook/SearchPanel';
+import { colors, fonts } from '../../../lib/theme';
 
 // Add-book hub: scanning is the main path; search and manual entry are the
 // fallbacks. Adding never navigates away — you stay here to add the next one.
@@ -18,12 +18,19 @@ export default function AddBook() {
   );
 }
 
+const EMPTY_PREFILL: ManualPrefill = { isbn: '', title: '', isbnNotFound: false };
+
 function AddBookHub() {
   const toast = useToast();
+  const scrollRef = useRef<ScrollView>(null);
   const [scanning, setScanning] = useState(false);
-  // ISBN handed over by the scanner's "Enter it manually" — prefills the
-  // manual form below. `n` remounts the form even when the same ISBN is handed over twice.
-  const [manualPrefill, setManualPrefill] = useState({ isbn: '', n: 0 });
+  const [manualOpen, setManualOpen] = useState(false);
+  // Details handed over by the scanner or search — prefill the manual form.
+  // `n` remounts the form (and re-scrolls to it) even when the same details
+  // are handed over twice.
+  const [manualPrefill, setManualPrefill] = useState({ ...EMPTY_PREFILL, n: 0 });
+  // Set by a handover; the manual section scrolls itself into view once laid out.
+  const scrollToManualRef = useRef(false);
 
   function handleScannerClose(addedCount: number) {
     setScanning(false);
@@ -32,118 +39,69 @@ function AddBookHub() {
     }
   }
 
+  function openManual(prefill: ManualPrefill) {
+    scrollToManualRef.current = true;
+    setManualPrefill((p) => ({ ...prefill, n: p.n + 1 }));
+    setManualOpen(true);
+  }
+
+  // Opened by hand: start blank rather than with an older handover's details.
+  function openManualBlank() {
+    setManualPrefill((p) => ({ ...EMPTY_PREFILL, n: p.n }));
+    setManualOpen(true);
+  }
+
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <Button title="Scan barcode" onPress={() => setScanning(true)} style={styles.scanButton} />
       <Text style={styles.explainer}>
         Scan the barcode on the back of each book — you can add several in a row.
       </Text>
 
-      {/* SearchPanel (phase 3) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Or search</Text>
+        <SearchPanel onManualEntry={openManual} />
+      </View>
 
-      <ManualForm key={manualPrefill.n} initialIsbn={manualPrefill.isbn} />
+      {manualOpen ? (
+        <View
+          key={manualPrefill.n}
+          style={styles.section}
+          onLayout={(e) => {
+            if (!scrollToManualRef.current) return;
+            scrollToManualRef.current = false;
+            scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - 16), animated: true });
+          }}
+        >
+          <View style={styles.manualHeader}>
+            <Text style={styles.sectionTitle}>Enter manually</Text>
+            <Pressable onPress={() => setManualOpen(false)} hitSlop={8}>
+              <Text style={styles.hideText}>Hide</Text>
+            </Pressable>
+          </View>
+          <ManualForm
+            initialIsbn={manualPrefill.isbn}
+            isbnNotFound={manualPrefill.isbnNotFound}
+            initialTitle={manualPrefill.title}
+          />
+        </View>
+      ) : (
+        <Pressable style={styles.manualLink} onPress={openManualBlank} hitSlop={6}>
+          <Text style={styles.manualLinkText}>Enter manually</Text>
+        </Pressable>
+      )}
 
       <ScannerModal
         visible={scanning}
         onClose={handleScannerClose}
-        onManualEntry={(isbn) => setManualPrefill((p) => ({ isbn, n: p.n + 1 }))}
+        onManualEntry={(isbn) => openManual({ isbn, title: '', isbnNotFound: true })}
       />
     </ScrollView>
-  );
-}
-
-// TODO(phase 3): replace with ManualForm
-function ManualForm({ initialIsbn }: { initialIsbn: string }) {
-  const toast = useToast();
-  const [isbn, setIsbn] = useState(initialIsbn);
-  const [title, setTitle] = useState('');
-  const [authors, setAuthors] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleAdd() {
-    setError(null);
-
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      setError('Title is required.');
-      return;
-    }
-
-    let normalized: string | null = null;
-    if (isbn.trim()) {
-      normalized = normalizeIsbn(isbn);
-      if (!normalized) {
-        setError("That ISBN doesn't look right — check it, or leave it blank.");
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      const { alreadyOnShelf } = await addToShelf({
-        isbn: normalized,
-        title: trimmedTitle,
-        authors: authors
-          .split(',')
-          .map((a) => a.trim())
-          .filter(Boolean),
-        source: 'manual',
-      });
-      setIsbn('');
-      setTitle('');
-      setAuthors('');
-      toast.show({
-        message: alreadyOnShelf ? `${trimmedTitle} is already on your shelf` : `Added ${trimmedTitle}`,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not add this book.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <View style={styles.manual}>
-      <Text style={styles.sectionTitle}>Enter manually</Text>
-      {initialIsbn !== '' && isbn === initialIsbn && (
-        <Text style={styles.prefillNote}>
-          We couldn't find ISBN {initialIsbn} — add its title and author below.
-        </Text>
-      )}
-
-      <Text style={styles.label}>Title</Text>
-      <TextInput
-        style={inputStyle}
-        placeholder="The Left Hand of Darkness"
-        placeholderTextColor={colors.textFaint}
-        value={title}
-        onChangeText={setTitle}
-      />
-
-      <Text style={styles.label}>Author(s)</Text>
-      <TextInput
-        style={inputStyle}
-        placeholder="Ursula K. Le Guin"
-        placeholderTextColor={colors.textFaint}
-        value={authors}
-        onChangeText={setAuthors}
-      />
-
-      <Text style={styles.label}>ISBN (optional)</Text>
-      <TextInput
-        style={inputStyle}
-        placeholder="9780441478125"
-        placeholderTextColor={colors.textFaint}
-        value={isbn}
-        onChangeText={setIsbn}
-        keyboardType="numbers-and-punctuation"
-      />
-
-      {error && <Text style={styles.errorText}>{error}</Text>}
-
-      <Button title="Add to shelf" variant="secondary" onPress={handleAdd} loading={loading} />
-    </View>
   );
 }
 
@@ -166,7 +124,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-  manual: {
+  section: {
     marginTop: 32,
   },
   sectionTitle: {
@@ -176,22 +134,25 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 12,
   },
-  prefillNote: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.text,
-    marginBottom: 12,
+  manualHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  label: {
-    fontFamily: fonts.semibold,
+  hideText: {
+    fontFamily: fonts.medium,
     fontSize: 13,
     color: colors.textMuted,
-    marginBottom: 6,
+    textDecorationLine: 'underline',
   },
-  errorText: {
-    fontFamily: fonts.medium,
-    color: colors.danger,
+  manualLink: {
+    alignSelf: 'center',
+    marginTop: 28,
+    paddingVertical: 4,
+  },
+  manualLinkText: {
+    fontFamily: fonts.semibold,
     fontSize: 14,
-    marginBottom: 12,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });
