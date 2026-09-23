@@ -1,0 +1,17 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- sharedShelf app icon ("Three books"). Master for every generated icon size. -->
+  <rect width="1024" height="1024" fill="#f5f7fa"/>
+  <rect x="260" y="280" width="128" height="420" rx="14" fill="#34506b"/>
+  <rect x="260" y="340" width="128" height="16" fill="#f5f7fa" opacity="0.75"/>
+  <rect x="404" y="200" width="136" height="500" rx="14" fill="#0e1116"/>
+  <rect x="404" y="264" width="136" height="16" fill="#f5f7fa" opacity="0.75"/>
+  <rect x="404" y="300" width="136" height="16" fill="#f5f7fa" opacity="0.75"/>
+  <rect x="404" y="620" width="136" height="16" fill="#f5f7fa" opacity="0.75"/>
+  <g transform="translate(656 700) rotate(-16)">
+    <rect x="0" y="-420" width="120" height="420" rx="14" fill="#a8643f"/>
+    <rect x="0" y="-356" width="120" height="16" fill="#f5f7fa" opacity="0.75"/>
+  </g>
+  <rect x="192" y="700" width="640" height="44" rx="10" fill="#0e1116"/>
+  <path d="M252 744 L332 744 L252 824 Z" fill="#0e1116"/>
+  <path d="M772 744 L692 744 L772 824 Z" fill="#0e1116"/>
+</svg>
