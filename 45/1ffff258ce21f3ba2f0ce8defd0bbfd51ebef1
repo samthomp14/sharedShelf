@@ -1,0 +1,26 @@
+public/index.html
+  s_fdf5fdf1e96fc0::t_20b81e93dc7531 33-56
+scripts/generate-launch-images.py
+  s_fdf5fdf1e96fc0::t_647fe4ed647d41 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "451ffff258ce21f3ba2f0ce8defd0bbfd51ebef1",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
