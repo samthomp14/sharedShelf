@@ -1,0 +1,24 @@
+supabase/schema.sql
+  s_cf6e55ff3a0eb7::t_882392e85f995a 88-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5f8f4d666693727dcc4db09fc3aa7e8aa65ab42",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_cf6e55ff3a0eb7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68a2e316-7995-4842-8fcd-03b892a1bd7f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
