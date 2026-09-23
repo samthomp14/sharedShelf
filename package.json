@@ -8,6 +8,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.112.3",
     "babel-preset-expo": "~57.0.0",
+    "barcode-detector": "^3.2.2",
     "expo": "~57.0.15",
     "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.13",

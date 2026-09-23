@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { classifyBarcode } from '../../lib/isbn';
 import {
   addToShelf,
@@ -12,16 +12,13 @@ import {
 } from '../../lib/bookLookup';
 import { Button } from '../Button';
 import { ToastProvider, useToast } from '../Toast';
+import { BarcodeCamera } from './BarcodeCamera';
 import { BookResultCard, type BookResultStatus } from './BookResultCard';
 import { colors, fonts, radius } from '../../lib/theme';
 
 // Continuous scanning session: scan → look up (our catalog first) → one tap
 // to add → the card clears itself and the camera is ready for the next book.
 // The session stays open until "Done", which reports how many were added.
-
-// Module-level so the array's identity is stable — on web, CameraView
-// restarts its detector whenever this prop changes identity.
-const BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e'];
 
 const NOT_ISBN_HINT =
   "That's not the ISBN barcode — look for the one starting 978, usually on the back or inside cover.";
@@ -150,7 +147,7 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
     clearSheet();
   }
 
-  function handleBarcodeScanned({ data }: { data: string }) {
+  function handleBarcodeScanned(data: string) {
     if (busyRef.current) return;
 
     const result = classifyBarcode(data);
@@ -340,7 +337,7 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
   // The hub asks for camera access in the Scan tap itself (iOS web apps only
   // honor the prompt inside a user gesture). Here we just show the camera
   // unless access is known to be off — the permission status can stay
-  // unknown on iOS, and CameraView requests the stream itself on mount.
+  // unknown on iOS, and BarcodeCamera requests the stream itself on mount.
   if (permission?.status === 'denied' || mountError) {
     return (
       <View style={[styles.container, styles.deniedContainer, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
@@ -366,13 +363,7 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
-        onBarcodeScanned={handleBarcodeScanned}
-        onMountError={() => setMountError(true)}
-      />
+      <BarcodeCamera onScanned={handleBarcodeScanned} onError={() => setMountError(true)} />
       <View style={styles.viewfinderWrap} pointerEvents="none">
         <View style={styles.viewfinder} />
       </View>
