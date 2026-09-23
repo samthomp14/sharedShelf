@@ -1,0 +1,30 @@
+app.json
+  s_fdf5fdf1e96fc0::t_95cd24d9b59f37 23-33
+vercel.json
+  s_fdf5fdf1e96fc0::t_95cd24d9b59f37 11-34
+public/manifest.webmanifest
+  s_fdf5fdf1e96fc0::t_95cd24d9b59f37 1-19
+public/index.html
+  s_fdf5fdf1e96fc0::t_95cd24d9b59f37 1-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "340c2466943f0d80d17e984b89f45015c3830944",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
