@@ -1,0 +1,53 @@
+app/(app)/author/[name].tsx
+  s_fdf5fdf1e96fc0::t_4a4298c3d1c779 7-8,47-48,75
+lib/pwa.ts
+  s_fdf5fdf1e96fc0::t_055631bb097934 1-105
+app/(app)/book/[id].tsx
+  s_fdf5fdf1e96fc0::t_4a4298c3d1c779 11-12,63,67,88-91,153-157
+components/RefreshControl.web.tsx
+  s_fdf5fdf1e96fc0::t_6b557f16454aaf 111-112
+  s_fdf5fdf1e96fc0::t_1bd518e3782687 1-110,113-123
+app/(app)/_layout.tsx
+  s_fdf5fdf1e96fc0::t_6a4d2cf3fcf227 4-11
+components/RefreshControl.tsx
+  s_fdf5fdf1e96fc0::t_865460ae013360 1-9
+app/(app)/(tabs)/index.tsx
+  s_fdf5fdf1e96fc0::t_aea36a8a8a6a88 3,11-13,262-263,305,307
+lib/refresh.ts
+  s_fdf5fdf1e96fc0::t_fade9e53443caf 1-50
+lib/bookDetail.ts
+  s_fdf5fdf1e96fc0::t_12f65634cf548a 2,22-31
+app/(app)/profile/[username].tsx
+  s_fdf5fdf1e96fc0::t_4a4298c3d1c779 10-11,117-118,167-171
+lib/theme.ts
+  s_fdf5fdf1e96fc0::t_ee3e16d6492eb6 75
+app/(app)/(tabs)/profile/index.tsx
+  s_fdf5fdf1e96fc0::t_4a4298c3d1c779 10-11,71-72,109-113
+lib/prefetch.ts
+  s_fdf5fdf1e96fc0::t_12f65634cf548a 5-9,12-14,19-27
+app/(app)/profile/friends.tsx
+  s_fdf5fdf1e96fc0::t_4a4298c3d1c779 9-10,67-68,94
+components/InstallBanner.tsx
+  s_fdf5fdf1e96fc0::t_022bec5a3db760 1-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7ad1454325d7d77ddfbdcaea3fcf47887fe0554a",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
