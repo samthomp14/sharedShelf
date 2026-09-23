@@ -20,7 +20,17 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "sharedShelf",
+      "shortName": "sharedShelf",
+      "lang": "en",
+      "themeColor": "#f5f7fa",
+      "backgroundColor": "#f5f7fa",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "scope": "/",
+      "barStyle": "default"
     },
     "plugins": [
       "expo-router",
