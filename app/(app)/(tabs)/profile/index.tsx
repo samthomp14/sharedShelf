@@ -7,6 +7,8 @@ import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
 import { ShelfGrid } from '../../../../components/ShelfGrid';
 import { Skeleton } from '../../../../components/Skeleton';
+import { RefreshControl } from '../../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../../lib/theme';
 
 interface OwnProfile {
@@ -66,6 +68,8 @@ export default function Profile() {
       load();
     }, [load])
   );
+  const { refreshing, onRefresh } = useRefreshing(load);
+  useRefetchOnVisible(load);
 
   // Nothing to instant-paint from here (it's a tab, not tapped into from a
   // list) — skeleton the whole layout until the first load lands. Once we
@@ -102,7 +106,11 @@ export default function Profile() {
   const name = profile.display_name ?? profile.username;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <View style={styles.topRow}>
         <Avatar avatarUrl={profile.avatar_url} label={name} size={80} />
         <View style={styles.stats}>

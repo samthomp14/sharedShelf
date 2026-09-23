@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { prefetch, consumePrefetch } from './prefetch';
+import { prefetch, consumePrefetch, clearPrefetch } from './prefetch';
 
 function fetchBookAndCopies(id: string) {
   return Promise.all([
@@ -19,6 +19,15 @@ export function prefetchBook(id: string) {
   prefetch(`book:${id}`, () => fetchBookAndCopies(id));
 }
 
-export function loadBookAndCopies(id: string): Promise<BookAndCopiesResult> {
+// `fresh` (pull-to-refresh, returning to the app) skips any prefetched result
+// and always hits the network.
+export function loadBookAndCopies(
+  id: string,
+  { fresh = false }: { fresh?: boolean } = {}
+): Promise<BookAndCopiesResult> {
+  if (fresh) {
+    clearPrefetch(`book:${id}`);
+    return fetchBookAndCopies(id);
+  }
   return consumePrefetch<BookAndCopiesResult>(`book:${id}`) ?? fetchBookAndCopies(id);
 }

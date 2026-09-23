@@ -6,6 +6,8 @@ import { profileHref } from '../../../lib/profileHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Skeleton } from '../../../components/Skeleton';
+import { RefreshControl } from '../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface FriendRow {
@@ -62,6 +64,8 @@ export default function Friends() {
       load();
     }, [load])
   );
+  const { refreshing, onRefresh } = useRefreshing(load);
+  useRefetchOnVisible(load);
 
   if (!hasLoaded) {
     return (
@@ -87,8 +91,7 @@ export default function Friends() {
         data={friends}
         keyExtractor={(item) => item.friendId}
         contentContainerStyle={styles.list}
-        refreshing={loading}
-        onRefresh={load}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>

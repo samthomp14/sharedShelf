@@ -7,6 +7,8 @@ import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { ShelfGrid } from '../../../components/ShelfGrid';
 import { Skeleton, SkeletonText } from '../../../components/Skeleton';
+import { RefreshControl } from '../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts } from '../../../lib/theme';
 
 interface OtherProfile {
@@ -112,6 +114,8 @@ export default function UserProfile() {
       load();
     }, [load])
   );
+  const { refreshing, onRefresh } = useRefreshing(load);
+  useRefetchOnVisible(load);
 
   async function sendRequest() {
     if (!ownerId || !profile) return;
@@ -160,7 +164,11 @@ export default function UserProfile() {
   const isFriends = status === 'friends';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <View style={styles.topRow}>
         <Avatar avatarUrl={avatarUrl} label={name} size={80} />
         <View style={styles.stats}>

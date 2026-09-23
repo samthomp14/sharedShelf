@@ -72,6 +72,7 @@ export const inputStyle: TextStyle = {
   paddingHorizontal: 14,
   paddingVertical: 12,
   marginBottom: 12,
+  // Keep at 16+: iOS Safari zooms the page when focusing a smaller input.
   fontSize: 16,
   color: colors.text,
   backgroundColor: colors.background,

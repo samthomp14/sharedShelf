@@ -4,6 +4,8 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
 import { Skeleton } from '../../../components/Skeleton';
+import { RefreshControl } from '../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface Book {
@@ -42,6 +44,8 @@ export default function AuthorBooks() {
       load();
     }, [load])
   );
+  const { refreshing, onRefresh } = useRefreshing(load);
+  useRefetchOnVisible(load);
 
   // Name is already known from the route — render it immediately, and
   // skeleton the grid until the first fetch for this author lands.
@@ -68,8 +72,7 @@ export default function AuthorBooks() {
         numColumns={3}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.list}
-        refreshing={loading}
-        onRefresh={load}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={<Text style={styles.title}>{authorName}</Text>}
         ListEmptyComponent={
           !loading ? <Text style={styles.emptyBody}>No books by this author yet.</Text> : null

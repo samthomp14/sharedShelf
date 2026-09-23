@@ -8,6 +8,8 @@ import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
 import { AuthorList } from '../../../components/AuthorList';
 import { Skeleton } from '../../../components/Skeleton';
+import { RefreshControl } from '../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
 interface Book {
@@ -58,11 +60,11 @@ export default function BookDetail() {
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [returningId, setReturningId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ fresh = false }: { fresh?: boolean } = {}) => {
     if (!id) return;
     setLoading(true);
 
-    const [bookResult, copiesResult] = await loadBookAndCopies(id);
+    const [bookResult, copiesResult] = await loadBookAndCopies(id, { fresh });
 
     if (!bookResult.error && bookResult.data) {
       setBook(bookResult.data);
@@ -83,6 +85,10 @@ export default function BookDetail() {
       load();
     }, [load])
   );
+  // Explicit refreshes always go to the network, never a prefetched result.
+  const refetch = useCallback(() => load({ fresh: true }), [load]);
+  const { refreshing, onRefresh } = useRefreshing(refetch);
+  useRefetchOnVisible(refetch);
 
   async function requestToBorrow(shelfItemId: string) {
     if (!ownerId) return;
@@ -144,7 +150,11 @@ export default function BookDetail() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <View style={styles.header}>
         {book.cover_url ? (
           <Image source={{ uri: book.cover_url }} style={styles.cover} resizeMode="cover" />

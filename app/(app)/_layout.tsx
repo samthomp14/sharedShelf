@@ -1,6 +1,14 @@
 import { Stack } from 'expo-router';
 import { colors, fonts } from '../../lib/theme';
 
+// Keep the tabs underneath every pushed screen, even on a deep link or a
+// fresh page load straight to e.g. /book/123. Without this the stack starts
+// at that screen, so there's no header back button — and in the installed
+// home-screen app there's no browser back button either.
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
 export default function AppLayout() {
   return (
     <Stack

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, type Href } from 'expo-router';
-import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
 import { profileHref } from '../../../lib/profileHref';
@@ -8,6 +8,9 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '../../../components/Button';
 import { InlineLink } from '../../../components/InlineLink';
+import { InstallBanner } from '../../../components/InstallBanner';
+import { RefreshControl } from '../../../components/RefreshControl';
+import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { timeAgo } from '../../../lib/time';
 import { colors, fonts, radius } from '../../../lib/theme';
 
@@ -256,6 +259,8 @@ export default function Activity() {
       load();
     }, [load])
   );
+  const { refreshing, onRefresh } = useRefreshing(load);
+  useRefetchOnVisible(load);
 
   async function respondLoanRequest(requestId: string, status: 'accepted' | 'declined') {
     setActingId(requestId);
@@ -297,8 +302,9 @@ export default function Activity() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      <InstallBanner />
       {hasNeedsYou && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Needs you</Text>
