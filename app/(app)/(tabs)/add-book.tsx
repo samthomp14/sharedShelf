@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCameraPermissions } from 'expo-camera';
 import { Button } from '../../../components/Button';
 import { ToastProvider, useToast } from '../../../components/Toast';
 import { ManualForm } from '../../../components/addBook/ManualForm';
@@ -24,6 +25,7 @@ function AddBookHub() {
   const toast = useToast();
   const scrollRef = useRef<ScrollView>(null);
   const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
   const [manualOpen, setManualOpen] = useState(false);
   // Details handed over by the scanner or search — prefill the manual form.
   // `n` remounts the form (and re-scrolls to it) even when the same details
@@ -31,6 +33,16 @@ function AddBookHub() {
   const [manualPrefill, setManualPrefill] = useState({ ...EMPTY_PREFILL, n: 0 });
   // Set by a handover; the manual section scrolls itself into view once laid out.
   const scrollToManualRef = useRef(false);
+
+  // Ask for camera access inside the tap itself: iOS home-screen web apps only
+  // show the prompt for a user gesture. The scanner shows its own "camera is
+  // off" state if access ends up denied.
+  async function openScanner() {
+    if (!permission?.granted) {
+      await requestPermission();
+    }
+    setScanning(true);
+  }
 
   function handleScannerClose(addedCount: number) {
     setScanning(false);
@@ -58,7 +70,7 @@ function AddBookHub() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <Button title="Scan barcode" onPress={() => setScanning(true)} style={styles.scanButton} />
+      <Button title="Scan barcode" onPress={openScanner} style={styles.scanButton} />
       <Text style={styles.explainer}>
         Scan the barcode on the back of each book — you can add several in a row.
       </Text>

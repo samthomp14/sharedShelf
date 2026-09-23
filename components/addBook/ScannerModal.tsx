@@ -110,14 +110,8 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
   const lookupIdRef = useRef(0);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const askedRef = useRef(false);
-
-  useEffect(() => {
-    if (permission && !permission.granted && permission.canAskAgain && !askedRef.current) {
-      askedRef.current = true;
-      requestPermission();
-    }
-  }, [permission, requestPermission]);
+  // Set when the camera fails to start (e.g. access blocked in Settings).
+  const [mountError, setMountError] = useState(false);
 
   useEffect(
     () => () => {
@@ -343,19 +337,25 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
     </View>
   );
 
-  // Permission still loading: plain black until we know.
-  if (!permission) {
-    return <View style={styles.container} />;
-  }
-
-  if (!permission.granted) {
+  // The hub asks for camera access in the Scan tap itself (iOS web apps only
+  // honor the prompt inside a user gesture). Here we just show the camera
+  // unless access is known to be off — the permission status can stay
+  // unknown on iOS, and CameraView requests the stream itself on mount.
+  if (permission?.status === 'denied' || mountError) {
     return (
       <View style={[styles.container, styles.deniedContainer, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
         <Text style={styles.deniedText}>
           Camera access is off. Enable it in Settings, or search/enter the book instead.
         </Text>
-        {permission.canAskAgain && (
-          <Button title="Allow camera" variant="secondary" onPress={() => requestPermission()} />
+        {permission?.canAskAgain && (
+          <Button
+            title="Allow camera"
+            variant="secondary"
+            onPress={async () => {
+              const result = await requestPermission();
+              if (result.granted) setMountError(false);
+            }}
+          />
         )}
         <Pressable style={styles.doneButton} onPress={() => onClose(countRef.current)}>
           <Text style={styles.doneText}>Close</Text>
@@ -371,6 +371,7 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
         onBarcodeScanned={handleBarcodeScanned}
+        onMountError={() => setMountError(true)}
       />
       <View style={styles.viewfinderWrap} pointerEvents="none">
         <View style={styles.viewfinder} />
