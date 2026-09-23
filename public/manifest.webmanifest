@@ -2,7 +2,7 @@
   "id": "/",
   "name": "sharedShelf",
   "short_name": "sharedShelf",
-  "description": "Share your bookshelf with friends.",
+  "description": "See what your friends are reading, and borrow it.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",
