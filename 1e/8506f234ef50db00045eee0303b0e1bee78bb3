@@ -1,0 +1,33 @@
+components/addBook/BookResultCard.tsx
+  s_cf6e55ff3a0eb7::t_912eedecd39d45 1-270
+components/Toast.tsx
+  s_cf6e55ff3a0eb7::t_632633de18fe7a 1-167
+app/(app)/(tabs)/add-book.tsx
+  s_cf6e55ff3a0eb7::t_7c136dc80c48c6 25,109
+  s_cf6e55ff3a0eb7::t_10d079c614ac60 1-2,4-8,10-11,13-18,21-22,24,28-32,35-40,42,46-48,50-53,55-62,67-68,73-77,82-102,107-108,121,130,133-141,143,145,151,154-155,157,160,162-164,166-167,169-170,172-173,176,183,185-189
+  s_cf6e55ff3a0eb7::t_eb6b7f32076ac2 26,44,49,110-112,177,179-182
+components/addBook/ScannerModal.tsx
+  s_cf6e55ff3a0eb7::t_18398289ade3d4 1-41,50,52-54,58-82,87,89-92,97-264,270,274-500
+  s_cf6e55ff3a0eb7::t_e439a115baf0f5 42-49,51,55-57,83-86,88,93-96,265-269,271-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1e8506f234ef50db00045eee0303b0e1bee78bb3",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_cf6e55ff3a0eb7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68a2e316-7995-4842-8fcd-03b892a1bd7f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
