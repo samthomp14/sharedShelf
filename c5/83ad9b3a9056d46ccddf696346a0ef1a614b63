@@ -1,0 +1,40 @@
+components/Button.tsx
+  s_fdf5fdf1e96fc0::t_98bbb66792c8ff 1-2,9-10,13,28-33,56-59
+  s_fdf5fdf1e96fc0::t_bac4e01b713b5f 60
+app/(app)/profile/friends.tsx
+  s_fdf5fdf1e96fc0::t_d3ccf937456a00 10,96-100,105-108,142,152
+lib/share.ts
+  s_fdf5fdf1e96fc0::t_9b129848f6a0e8 1-54
+app/(app)/(tabs)/index.tsx
+  s_fdf5fdf1e96fc0::t_8b4d48f6ac827d 13,404,620
+app/(app)/(tabs)/profile/index.tsx
+  s_fdf5fdf1e96fc0::t_88ba15e8d6cd07 8,97-100,136-153,211-214,218-219
+  s_fdf5fdf1e96fc0::t_ccdfeac41b158c 220
+components/ShareAppButton.tsx
+  s_fdf5fdf1e96fc0::t_9ebb564cda0325 1-70
+components/ShareGlyph.tsx
+  s_fdf5fdf1e96fc0::t_8b2d93fb6fcd13 1-46
+components/InstallBanner.tsx
+  s_fdf5fdf1e96fc0::t_8b2d93fb6fcd13 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c583ad9b3a9056d46ccddf696346a0ef1a614b63",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
