@@ -1,0 +1,24 @@
+lib/theme.ts
+  s_fdf5fdf1e96fc0::t_cc3da527eea6ee 43-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "db9da8bf0e3551d4c4735bada54cf3bf00b36ef2",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_fdf5fdf1e96fc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aafed33e-ac95-42cb-8a5a-330972410807",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
