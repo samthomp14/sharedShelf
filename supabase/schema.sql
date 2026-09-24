@@ -41,14 +41,40 @@ create index profiles_display_name_trgm_idx on public.profiles using gin (displa
 -- Auto-create a profile row whenever a new auth user signs up. Username
 -- comes from the `username` field passed in signUp()'s options.data —
 -- falls back to the user's id if that's somehow missing.
+--
+-- If they signed up from an invite link (/invite/<username>), signUp() also
+-- passes `invited_by`, and we send the inviter a friend request from the new
+-- user. An unknown or renamed inviter is simply skipped — an invite must
+-- never make signup fail.
 create function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  inviter_id uuid;
 begin
   insert into public.profiles (id, username)
   values (new.id, coalesce(new.raw_user_meta_data ->> 'username', new.id::text));
+
+  if new.raw_user_meta_data ->> 'invited_by' is not null then
+    begin
+      select id into inviter_id from public.profiles
+      where lower(username) = lower(new.raw_user_meta_data ->> 'invited_by')
+        and id <> new.id
+      limit 1;
+
+      if inviter_id is not null then
+        insert into public.friendships (requester_id, addressee_id)
+        values (new.id, inviter_id)
+        on conflict do nothing;
+      end if;
+    exception when others then
+      raise warning 'handle_new_user: invite from % skipped: %',
+        new.raw_user_meta_data ->> 'invited_by', sqlerrm;
+    end;
+  end if;
+
   return new;
 end;
 $$;

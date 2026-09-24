@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/Button';
 import { colors, fonts, radius } from '../../lib/theme';
@@ -10,11 +11,15 @@ type Message = { type: 'error' | 'success'; text: string };
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 
 export default function SignIn() {
+  // Set when arriving from an invite link (/invite/<username>).
+  const params = useLocalSearchParams<{ invite?: string }>();
+  const invitedBy = params.invite && USERNAME_PATTERN.test(params.invite) ? params.invite : null;
+
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [mode, setMode] = useState<Mode>('sign-in');
+  const [mode, setMode] = useState<Mode>(invitedBy ? 'sign-up' : 'sign-in');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
@@ -61,7 +66,7 @@ export default function SignIn() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { username } },
+        options: { data: invitedBy ? { username, invited_by: invitedBy } : { username } },
       });
       if (error) {
         setMessage({ type: 'error', text: friendlyError(error.message) });
@@ -86,6 +91,15 @@ export default function SignIn() {
     <View style={styles.container}>
       <Text style={styles.title}>sharedShelf</Text>
       <Text style={styles.subtitle}>Your friends' shelves, one tap away.</Text>
+
+      {invitedBy && (
+        <Text style={styles.invite}>
+          @{invitedBy} invited you.{' '}
+          {mode === 'sign-up'
+            ? "Sign up and we'll send them a friend request."
+            : 'Sign in, then find them in Search.'}
+        </Text>
+      )}
 
       {mode === 'sign-up' && (
         <TextInput
@@ -171,6 +185,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 32,
+  },
+  invite: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   input: {
     fontFamily: fonts.regular,
