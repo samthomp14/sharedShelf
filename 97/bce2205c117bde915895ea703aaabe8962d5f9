@@ -1,0 +1,38 @@
+supabase/schema.sql
+  s_1c4ee4a04ece6a::t_acbed98abad18a 45-48,58,60,62-63,240-369
+  s_1c4ee4a04ece6a::t_3ea12c5b962433 370
+app/invite/[code].tsx
+  s_1c4ee4a04ece6a::t_beea3494c3b2b7 1-52
+app/(auth)/sign-in.tsx
+  s_1c4ee4a04ece6a::t_cbc45d37c1ffe7 1,5,13-16,19,21-22,28,32-51,90-93,99,125,127,130-131
+  s_1c4ee4a04ece6a::t_f6282311851cd4 132
+lib/database.types.ts
+  s_1c4ee4a04ece6a::t_ed9c6ba16b089f 56-67
+components/ShareAppButton.tsx
+  s_1c4ee4a04ece6a::t_cbc45d37c1ffe7 5,13-18,20,23-27,30,32-39,43,45,61
+app/_layout.tsx
+  s_1c4ee4a04ece6a::t_ed9c6ba16b089f 59
+lib/share.ts
+  s_1c4ee4a04ece6a::t_cbc45d37c1ffe7 10-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "97bce2205c117bde915895ea703aaabe8962d5f9",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_1c4ee4a04ece6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fbcd089b-ed8c-4005-9233-9a11d5af710c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
