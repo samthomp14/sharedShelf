@@ -42,36 +42,25 @@ create index profiles_display_name_trgm_idx on public.profiles using gin (displa
 -- comes from the `username` field passed in signUp()'s options.data —
 -- falls back to the user's id if that's somehow missing.
 --
--- If they signed up from an invite link (/invite/<username>), signUp() also
--- passes `invited_by`, and we send the inviter a friend request from the new
--- user. An unknown or renamed inviter is simply skipped — an invite must
--- never make signup fail.
+-- If they signed up from an invite link (/invite/<code>), signUp() also
+-- passes `invite_code`, and accept_invite (see the invites section) makes
+-- them friends with the inviter. An unknown or expired code is simply
+-- skipped — an invite must never make signup fail.
 create function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
-declare
-  inviter_id uuid;
 begin
   insert into public.profiles (id, username)
   values (new.id, coalesce(new.raw_user_meta_data ->> 'username', new.id::text));
 
-  if new.raw_user_meta_data ->> 'invited_by' is not null then
+  if new.raw_user_meta_data ->> 'invite_code' is not null then
     begin
-      select id into inviter_id from public.profiles
-      where lower(username) = lower(new.raw_user_meta_data ->> 'invited_by')
-        and id <> new.id
-      limit 1;
-
-      if inviter_id is not null then
-        insert into public.friendships (requester_id, addressee_id)
-        values (new.id, inviter_id)
-        on conflict do nothing;
-      end if;
+      perform public.accept_invite(new.id, new.raw_user_meta_data ->> 'invite_code');
     exception when others then
-      raise warning 'handle_new_user: invite from % skipped: %',
-        new.raw_user_meta_data ->> 'invited_by', sqlerrm;
+      raise warning 'handle_new_user: invite % skipped: %',
+        new.raw_user_meta_data ->> 'invite_code', sqlerrm;
     end;
   end if;
 
@@ -247,6 +236,137 @@ as $$
 $$;
 
 revoke execute on function public.friend_count(uuid) from public, anon;
+
+-- ============================================================
+-- invites: expiring invite codes (/invite/<code>). Using one makes
+-- you and the inviter friends straight away — no request to accept —
+-- since only people the inviter shared the link with have the code.
+-- Codes are multi-use and last 7 days. Everything goes through the
+-- functions below, so the table itself has no RLS policies.
+-- ============================================================
+create table public.invites (
+  code text primary key,
+  inviter_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days'
+);
+
+create index invites_inviter_id_expires_at_idx on public.invites (inviter_id, expires_at);
+
+alter table public.invites enable row level security;
+
+-- Your current invite code, for the share buttons. Reuses one with at least
+-- a day left so a link you just sent doesn't die tomorrow; otherwise mints a
+-- new one.
+create function public.get_invite_code()
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_code text;
+begin
+  if auth.uid() is null then
+    raise exception 'not signed in';
+  end if;
+
+  select code into v_code from public.invites
+  where inviter_id = auth.uid() and expires_at > now() + interval '1 day'
+  order by expires_at desc
+  limit 1;
+
+  if v_code is null then
+    -- 9 random bytes -> 12 URL-safe characters.
+    v_code := translate(encode(extensions.gen_random_bytes(9), 'base64'), '+/', '-_');
+    insert into public.invites (code, inviter_id) values (v_code, auth.uid());
+  end if;
+
+  return v_code;
+end;
+$$;
+
+revoke execute on function public.get_invite_code() from public, anon;
+grant execute on function public.get_invite_code() to authenticated;
+
+-- Who sent an invite, for the sign-up screen ("@sam invited you"). Callable
+-- signed out, since that's who opens invite links. Returns no row for an
+-- unknown or expired code.
+create function public.invite_preview(p_code text)
+returns table (username text, display_name text)
+language sql
+security definer set search_path = public
+stable
+as $$
+  select p.username, p.display_name
+  from public.invites i
+  join public.profiles p on p.id = i.inviter_id
+  where i.code = p_code and i.expires_at > now();
+$$;
+
+revoke execute on function public.invite_preview(text) from public;
+grant execute on function public.invite_preview(text) to anon, authenticated;
+
+-- Makes p_user and the code's inviter friends: accepts a pending request in
+-- either direction, or creates an accepted friendship. Returns the inviter,
+-- or null for an unknown/expired code or your own code. Internal — called by
+-- handle_new_user (signup) and redeem_invite (existing users).
+create function public.accept_invite(p_user uuid, p_code text)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_inviter uuid;
+begin
+  select inviter_id into v_inviter from public.invites
+  where code = p_code and expires_at > now();
+
+  if v_inviter is null or v_inviter = p_user then
+    return null;
+  end if;
+
+  update public.friendships
+  set status = 'accepted', responded_at = now()
+  where status = 'pending'
+    and ((requester_id = p_user and addressee_id = v_inviter)
+      or (requester_id = v_inviter and addressee_id = p_user));
+
+  insert into public.friendships (requester_id, addressee_id, status, responded_at)
+  select v_inviter, p_user, 'accepted', now()
+  where not exists (
+    select 1 from public.friendships
+    where (requester_id = p_user and addressee_id = v_inviter)
+       or (requester_id = v_inviter and addressee_id = p_user)
+  );
+
+  return v_inviter;
+end;
+$$;
+
+revoke execute on function public.accept_invite(uuid, text) from public, anon, authenticated;
+
+-- An already-signed-up user opening an invite link. Returns the inviter's
+-- username so the app can open their profile, or null if the code is
+-- unknown, expired, or your own.
+create function public.redeem_invite(p_code text)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_inviter uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not signed in';
+  end if;
+
+  v_inviter := public.accept_invite(auth.uid(), p_code);
+  return (select username from public.profiles where id = v_inviter);
+end;
+$$;
+
+revoke execute on function public.redeem_invite(text) from public, anon;
+grant execute on function public.redeem_invite(text) to authenticated;
 
 -- ============================================================
 -- shelf_groups: a user's own custom categories for organizing

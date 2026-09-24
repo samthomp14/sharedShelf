@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { log } from '../lib/log';
 import { inviteUrl, shareApp } from '../lib/share';
 import { colors, fonts } from '../lib/theme';
 import { Button } from './Button';
@@ -9,37 +10,39 @@ import { ShareGlyph } from './ShareGlyph';
 
 const COPIED_FOR_MS = 2000;
 
-// Your own username, fetched once per signed-in user and shared by every
-// button. Looked up rather than read from the session because it can be
-// changed in Edit Profile.
-let cachedUsername: { userId: string; username: string } | null = null;
+// Your invite code, fetched once per signed-in user and shared by every
+// button. It has to be in hand before the tap: the web share sheet needs the
+// tap's user activation, so nothing can be awaited in the handler. The server
+// hands out codes with at least a day left, so refetch after a few hours.
+const CODE_FRESH_FOR_MS = 6 * 60 * 60 * 1000;
+let cachedCode: { userId: string; code: string; fetchedAt: number } | null = null;
 
-function useMyUsername(): string | null {
+function useInviteCode(): string | null {
   const { session } = useAuth();
   const userId = session?.user.id;
-  const [username, setUsername] = useState(
-    cachedUsername && cachedUsername.userId === userId ? cachedUsername.username : null
-  );
+  const cached =
+    cachedCode && cachedCode.userId === userId && Date.now() - cachedCode.fetchedAt < CODE_FRESH_FOR_MS
+      ? cachedCode.code
+      : null;
+  const [code, setCode] = useState(cached);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || cached) return;
     let active = true;
-    supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', userId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return;
-        cachedUsername = { userId, username: data.username };
-        if (active) setUsername(data.username);
-      });
+    supabase.rpc('get_invite_code').then(({ data, error }) => {
+      if (error) {
+        log.error('invite.get_code_failed', { error: error.message });
+        return;
+      }
+      cachedCode = { userId, code: data, fetchedAt: Date.now() };
+      if (active) setCode(data);
+    });
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, cached]);
 
-  return username;
+  return code;
 }
 
 interface ShareAppButtonProps {
@@ -55,7 +58,7 @@ export function ShareAppButton({ title = 'Invite friends', variant = 'primary', 
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const url = inviteUrl(useMyUsername());
+  const url = inviteUrl(useInviteCode());
 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);

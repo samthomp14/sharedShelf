@@ -53,6 +53,18 @@ export interface Database {
         Args: { p_isbn: string };
         Returns: CatalogBookRow[];
       };
+      get_invite_code: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      invite_preview: {
+        Args: { p_code: string };
+        Returns: { username: string; display_name: string | null }[];
+      };
+      redeem_invite: {
+        Args: { p_code: string };
+        Returns: string | null;
+      };
     };
     Tables: {
       profiles: {

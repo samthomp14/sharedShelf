@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { log } from '../../lib/log';
 import { Button } from '../../components/Button';
 import { colors, fonts, radius } from '../../lib/theme';
 
@@ -9,19 +10,44 @@ type Mode = 'sign-in' | 'sign-up';
 type Message = { type: 'error' | 'success'; text: string };
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
+const INVITE_CODE_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+// From an invite link: who sent it, or 'expired' for an unknown/expired code.
+type Invite = { status: 'loading' } | { status: 'valid'; name: string } | { status: 'expired' };
 
 export default function SignIn() {
-  // Set when arriving from an invite link (/invite/<username>).
+  // Set when arriving from an invite link (/invite/<code>).
   const params = useLocalSearchParams<{ invite?: string }>();
-  const invitedBy = params.invite && USERNAME_PATTERN.test(params.invite) ? params.invite : null;
+  const inviteCode = params.invite && INVITE_CODE_PATTERN.test(params.invite) ? params.invite : null;
+  const [invite, setInvite] = useState<Invite | null>(inviteCode ? { status: 'loading' } : null);
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [mode, setMode] = useState<Mode>(invitedBy ? 'sign-up' : 'sign-in');
+  const [mode, setMode] = useState<Mode>(inviteCode ? 'sign-up' : 'sign-in');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+
+  useEffect(() => {
+    if (!inviteCode) return;
+    let active = true;
+    supabase.rpc('invite_preview', { p_code: inviteCode }).then(({ data, error }) => {
+      if (!active) return;
+      if (error) log.warn('invite.preview_failed', { error: error.message });
+      const inviter = data?.[0];
+      setInvite(
+        inviter ? { status: 'valid', name: inviter.display_name ?? `@${inviter.username}` } : { status: 'expired' }
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, [inviteCode]);
+
+  // Only a code that checked out goes along; an expired one would be
+  // ignored by the server anyway.
+  const validInviteCode = invite?.status === 'valid' ? inviteCode : null;
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -61,12 +87,16 @@ export default function SignIn() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setMessage({ type: 'error', text: error.message });
+      } else if (validInviteCode) {
+        // Already had an account: become friends with the inviter now.
+        const { error: redeemError } = await supabase.rpc('redeem_invite', { p_code: validInviteCode });
+        if (redeemError) log.error('invite.redeem_failed', { error: redeemError.message });
       }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: invitedBy ? { username, invited_by: invitedBy } : { username } },
+        options: { data: validInviteCode ? { username, invite_code: validInviteCode } : { username } },
       });
       if (error) {
         setMessage({ type: 'error', text: friendlyError(error.message) });
@@ -92,13 +122,13 @@ export default function SignIn() {
       <Text style={styles.title}>sharedShelf</Text>
       <Text style={styles.subtitle}>Your friends' shelves, one tap away.</Text>
 
-      {invitedBy && (
+      {invite?.status === 'valid' && (
         <Text style={styles.invite}>
-          @{invitedBy} invited you.{' '}
-          {mode === 'sign-up'
-            ? "Sign up and we'll send them a friend request."
-            : 'Sign in, then find them in Search.'}
+          {invite.name} invited you. {mode === 'sign-up' ? 'Sign up' : 'Sign in'} and you'll be friends.
         </Text>
+      )}
+      {invite?.status === 'expired' && (
+        <Text style={styles.invite}>That invite link has expired, but you can still sign up.</Text>
       )}
 
       {mode === 'sign-up' && (

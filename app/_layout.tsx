@@ -56,7 +56,7 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
       {/* Unguarded: redirects on its own depending on whether you're signed in. */}
-      <Stack.Screen name="invite/[username]" options={{ headerShown: false }} />
+      <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
     </Stack>
   );
 }

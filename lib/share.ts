@@ -7,10 +7,11 @@ export const APP_URL = 'https://shared-shelf-henna.vercel.app/';
 const TITLE = 'sharedShelf';
 const TEXT = "Your friends' shelves, one tap away.";
 
-// Signing up from /invite/<username> sends that user a friend request. Falls
-// back to the plain app link while the username isn't known yet.
-export function inviteUrl(username?: string | null): string {
-  return username ? `${APP_URL}invite/${encodeURIComponent(username)}` : APP_URL;
+// /invite/<code>: opening it (signing up, or already signed in) makes you
+// friends with whoever shared it. Codes expire after 7 days. Falls back to the
+// plain app link while the code hasn't loaded yet.
+export function inviteUrl(code?: string | null): string {
+  return code ? `${APP_URL}invite/${encodeURIComponent(code)}` : APP_URL;
 }
 
 // - shared:    the share sheet completed (or, on native, was shown)
