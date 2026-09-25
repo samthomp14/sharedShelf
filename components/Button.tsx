@@ -4,13 +4,26 @@ import { colors, fonts, radius, shadow } from '../lib/theme';
 
 interface ButtonProps extends PressableProps {
   title: string;
-  variant?: 'primary' | 'secondary';
+  // ghost: a quiet text-only button for the secondary choice next to a
+  // primary one ("Decline", "Call off").
+  variant?: 'primary' | 'secondary' | 'ghost';
+  // compact: a little shorter, for buttons inside cards and list rows.
+  size?: 'default' | 'compact';
   loading?: boolean;
   // Optional glyph shown before the title.
   icon?: ReactNode;
 }
 
-export function Button({ title, variant = 'primary', loading, icon, disabled, style, ...props }: ButtonProps) {
+export function Button({
+  title,
+  variant = 'primary',
+  size = 'default',
+  loading,
+  icon,
+  disabled,
+  style,
+  ...props
+}: ButtonProps) {
   const isPrimary = variant === 'primary';
   return (
     <Pressable
@@ -18,7 +31,8 @@ export function Button({ title, variant = 'primary', loading, icon, disabled, st
       disabled={disabled || loading}
       style={(state) => [
         styles.base,
-        isPrimary ? styles.primary : styles.secondary,
+        size === 'compact' && styles.compact,
+        styles[variant],
         typeof style === 'function' ? style(state) : style,
       ]}
     >
@@ -27,7 +41,7 @@ export function Button({ title, variant = 'primary', loading, icon, disabled, st
       ) : (
         <View style={styles.content}>
           {icon}
-          <Text style={[styles.text, isPrimary ? styles.primaryText : styles.secondaryText]}>
+          <Text style={[styles.text, isPrimary ? styles.primaryText : variant === 'ghost' ? styles.ghostText : styles.secondaryText]}>
             {title}
           </Text>
         </View>
@@ -44,6 +58,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  compact: {
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
   primary: {
     backgroundColor: colors.text,
   },
@@ -52,6 +71,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow,
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
   },
   content: {
     flexDirection: 'row',
@@ -67,5 +90,8 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: colors.text,
+  },
+  ghostText: {
+    color: colors.textMuted,
   },
 });
