@@ -7,6 +7,9 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type FriendshipStatus = 'pending' | 'accepted';
 export type ShelfItemStatus = 'available' | 'requested' | 'on_loan';
 export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+// Lending v2 (see supabase/migrations/20260924120000_lending_v2_expand.sql).
+export type CopyLendStatus = 'available' | 'unavailable' | 'promised' | 'on_loan';
+export type LoanEndedReason = 'returned' | 'called_off' | 'removed';
 
 // Row shape returned by search_catalog / lookup_isbn.
 export interface CatalogBookRow {
@@ -64,6 +67,44 @@ export interface Database {
       redeem_invite: {
         Args: { p_code: string };
         Returns: string | null;
+      };
+      // Lending v2 step functions. Each raises a readable error when the
+      // caller or the copy/loan state doesn't allow the step.
+      request_loan: {
+        Args: { p_shelf_item_id: string };
+        Returns: string;
+      };
+      cancel_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
+      };
+      accept_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      decline_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
+      };
+      call_off_loan: {
+        Args: { p_loan_id: string };
+        Returns: undefined;
+      };
+      mark_handed_over: {
+        Args: { p_loan_id: string };
+        Returns: undefined;
+      };
+      lend_to_friend: {
+        Args: { p_shelf_item_id: string; p_friend_id: string };
+        Returns: string;
+      };
+      mark_returned: {
+        Args: { p_loan_id: string };
+        Returns: undefined;
+      };
+      set_copy_available: {
+        Args: { p_shelf_item_id: string; p_available: boolean };
+        Returns: undefined;
       };
     };
     Tables: {
@@ -184,6 +225,8 @@ export interface Database {
           owner_id: string;
           book_id: string;
           status: ShelfItemStatus;
+          // Lending v2 copy state. Only the step functions can change it.
+          lend_status: CopyLendStatus;
           visibility: 'friends' | 'private';
           group_id: string | null;
           sort_order: number;
@@ -242,6 +285,43 @@ export interface Database {
           returned_at?: string | null;
         };
         Update: Partial<Database['public']['Tables']['loans']['Insert']>;
+        Relationships: [];
+      };
+      // Lending v2: read-only for clients (select policy only); all writes
+      // go through the step functions above.
+      loan_requests_v2: {
+        Row: {
+          id: string;
+          shelf_item_id: string | null;
+          book_id: string;
+          owner_id: string;
+          requester_id: string;
+          status: LoanRequestStatus;
+          created_at: string;
+          responded_at: string | null;
+          legacy_request_id: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      loans_v2: {
+        Row: {
+          id: string;
+          shelf_item_id: string | null;
+          book_id: string;
+          owner_id: string;
+          borrower_id: string;
+          request_id: string | null;
+          created_at: string;
+          handed_over_at: string | null;
+          ended_at: string | null;
+          ended_reason: LoanEndedReason | null;
+          ended_by: string | null;
+          legacy_loan_id: string | null;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
     };
