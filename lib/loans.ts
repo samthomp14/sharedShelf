@@ -243,6 +243,28 @@ export async function fetchIncomingRequests(uid: string): Promise<PendingRequest
   return (data ?? []) as unknown as PendingRequest[];
 }
 
+// Requests you've sent that are still waiting on the owner, newest first.
+export interface OutgoingRequest {
+  id: string;
+  shelf_item_id: string | null;
+  created_at: string;
+  owner: Person | null;
+  book: BookRef | null;
+}
+
+export async function fetchMyPendingRequests(uid: string): Promise<OutgoingRequest[]> {
+  const { data, error } = await supabase
+    .from('loan_requests_v2')
+    .select(
+      `id, shelf_item_id, created_at, book:books(${BOOK}), owner:profiles!loan_requests_v2_owner_id_fkey(${PERSON})`
+    )
+    .eq('requester_id', uid)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) fail('my_pending_requests', error);
+  return (data ?? []) as unknown as OutgoingRequest[];
+}
+
 // Your most recent request on a copy (any status), or null if you never asked.
 // status 'pending' = waiting on the owner.
 export async function fetchMyRequest(shelfItemId: string, uid: string): Promise<MyRequest | null> {

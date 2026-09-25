@@ -236,7 +236,15 @@ export default function UserProfile() {
 
       {detailsLoaded && isFriends && (
         <View style={styles.grid}>
-          <ShelfGrid items={items ?? []} emptyText="This shelf is empty so far." />
+          <ShelfGrid
+            items={(items ?? []).map((item) => ({
+              id: item.id,
+              book: item.book,
+              // Friends never learn who has a copy, or why it's off.
+              badge: item.lend_status === 'available' ? null : { kind: 'unavailable', label: 'Unavailable' },
+            }))}
+            emptyText="This shelf is empty so far."
+          />
         </View>
       )}
     </ScrollView>

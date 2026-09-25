@@ -6,13 +6,25 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
 import { ShareAppButton } from '../../../../components/ShareAppButton';
-import { ShelfGrid } from '../../../../components/ShelfGrid';
-import { FilterChip } from '../../../../components/FilterChip';
-import { LoanList } from '../../../../components/profile/LoanList';
+import { ShelfGrid, type ShelfGridBadge } from '../../../../components/ShelfGrid';
+import { ProfileTabs } from '../../../../components/profile/ProfileTabs';
+import { BorrowingList, LentOutList } from '../../../../components/profile/LoanList';
+import { ToastProvider, useToast } from '../../../../components/Toast';
 import { Skeleton } from '../../../../components/Skeleton';
 import { RefreshControl } from '../../../../components/RefreshControl';
 import { useRefetchOnVisible, useRefreshing } from '../../../../lib/refresh';
-import { fetchBorrowing, fetchMyCopies, firstName, type ActiveLoan, type MyCopy } from '../../../../lib/loans';
+import {
+  cancelRequest,
+  fetchBorrowing,
+  fetchMyCopies,
+  fetchMyPendingRequests,
+  firstName,
+  markHandedOver,
+  markReturned,
+  type ActiveLoan,
+  type MyCopy,
+  type OutgoingRequest,
+} from '../../../../lib/loans';
 import { colors, fonts, organicCorners } from '../../../../lib/theme';
 
 interface OwnProfile {
@@ -24,28 +36,35 @@ interface OwnProfile {
 
 type ShelfTab = 'library' | 'lent' | 'borrowing';
 
-const TABS: { key: ShelfTab; label: string }[] = [
-  { key: 'library', label: 'Library' },
-  { key: 'lent', label: 'Lent out' },
-  { key: 'borrowing', label: 'Borrowing' },
-];
-
 // Your own shelf says who has a copy; friends only ever see "Unavailable".
-function copyLabel(copy: MyCopy) {
+function copyBadge(copy: MyCopy): ShelfGridBadge | null {
   const borrower = firstName(copy.activeLoan?.borrower);
-  if (copy.lend_status === 'promised') return `Promised to ${borrower}`;
-  if (copy.lend_status === 'on_loan') return `With ${borrower}`;
-  return 'Unavailable';
+  const initial = borrower.charAt(0).toUpperCase();
+  if (copy.lend_status === 'promised') return { kind: 'promised', label: `For ${borrower}`, initial };
+  if (copy.lend_status === 'on_loan') return { kind: 'out', label: `With ${borrower}`, initial };
+  if (copy.lend_status === 'unavailable') return { kind: 'off', label: 'Not lending' };
+  return null;
 }
 
 export default function Profile() {
+  return (
+    <ToastProvider>
+      <ProfileScreen />
+    </ToastProvider>
+  );
+}
+
+function ProfileScreen() {
   const router = useRouter();
+  const toast = useToast();
   const { session } = useAuth();
   const uid = session?.user?.id ?? null;
   const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [friendCount, setFriendCount] = useState(0);
   const [copies, setCopies] = useState<MyCopy[]>([]);
   const [borrowing, setBorrowing] = useState<ActiveLoan[]>([]);
+  const [requests, setRequests] = useState<OutgoingRequest[]>([]);
+  const [actingId, setActingId] = useState<string | null>(null);
   const [tab, setTab] = useState<ShelfTab>('library');
   const [loading, setLoading] = useState(true);
 
@@ -57,11 +76,12 @@ export default function Profile() {
     setLoading(true);
 
     // The loan reads throw (and log) on failure; keep whatever we had.
-    const [profileResult, countResult, copiesResult, borrowingResult] = await Promise.all([
+    const [profileResult, countResult, copiesResult, borrowingResult, requestsResult] = await Promise.all([
       supabase.from('profiles').select('username, display_name, avatar_url, bio').eq('id', uid).single(),
       supabase.rpc('friend_count', { target: uid }),
       fetchMyCopies(uid).catch(() => null),
       fetchBorrowing(uid).catch(() => null),
+      fetchMyPendingRequests(uid).catch(() => null),
     ]);
 
     if (!profileResult.error && profileResult.data) {
@@ -72,6 +92,7 @@ export default function Profile() {
     }
     if (copiesResult) setCopies(copiesResult);
     if (borrowingResult) setBorrowing(borrowingResult);
+    if (requestsResult) setRequests(requestsResult);
     setLoading(false);
   }, [uid]);
 
@@ -82,6 +103,19 @@ export default function Profile() {
   );
   const { refreshing, onRefresh } = useRefreshing(load);
   useRefetchOnVisible(load);
+
+  // Runs one lending step, shows its refusal (if any) as a toast, then
+  // reloads — the state may have moved on either way.
+  async function runLoanStep(id: string, run: () => Promise<unknown>) {
+    setActingId(id);
+    try {
+      await run();
+    } catch (e) {
+      toast.show({ message: e instanceof Error ? e.message : 'Something went wrong' });
+    }
+    setActingId(null);
+    load();
+  }
 
   // Nothing to instant-paint from here (it's a tab, not tapped into from a
   // list) — skeleton the whole layout until the first load lands. Once we
@@ -119,10 +153,8 @@ export default function Profile() {
   }
 
   const name = profile.display_name ?? profile.username;
-  // Lent out comes from the copies' active loans (no extra fetch), newest first.
-  const lentOut = copies
-    .flatMap((copy) => (copy.activeLoan ? [copy.activeLoan] : []))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  // Lent out comes from the copies' active loans (no extra fetch).
+  const lentOut = copies.flatMap((copy) => (copy.activeLoan ? [copy.activeLoan] : []));
 
   return (
     <ScrollView
@@ -167,34 +199,40 @@ export default function Profile() {
         <ShareAppButton style={styles.action} />
       </View>
 
-      <View style={styles.tabs}>
-        {TABS.map((t) => (
-          <FilterChip key={t.key} label={t.label} active={tab === t.key} onPress={() => setTab(t.key)} />
-        ))}
-      </View>
+      <ProfileTabs
+        tabs={[
+          { key: 'library', label: 'Library', count: copies.length },
+          { key: 'lent', label: 'Lent out', count: lentOut.length },
+          // Requests you've sent show on the tab but don't count: only books
+          // you have or are picking up.
+          { key: 'borrowing', label: 'Borrowing', count: borrowing.length },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {tab === 'library' && (
         <ShelfGrid
-          items={copies.map((copy) => ({
-            id: copy.id,
-            lend_status: copy.lend_status,
-            book: copy.book,
-            label: copyLabel(copy),
-          }))}
+          items={copies.map((copy) => ({ id: copy.id, book: copy.book, badge: copyBadge(copy) }))}
           emptyText="Your shelf is empty. Add a book to get started."
         />
       )}
       {tab === 'lent' && (
-        <LoanList
+        <LentOutList
           loans={lentOut}
-          side="lent"
+          actingId={actingId}
+          onHandedOver={(loan) => runLoanStep(loan.id, () => markHandedOver(loan.id))}
+          onReturned={(loan) => runLoanStep(loan.id, () => markReturned(loan.id))}
           emptyText="Nothing lent out right now. When you say yes to a friend, the book shows up here."
         />
       )}
       {tab === 'borrowing' && (
-        <LoanList
+        <BorrowingList
           loans={borrowing}
-          side="borrowing"
+          requests={requests}
+          actingId={actingId}
+          onGotIt={(loan) => runLoanStep(loan.id, () => markHandedOver(loan.id))}
+          onCancelRequest={(request) => runLoanStep(request.id, () => cancelRequest(request.id))}
           emptyText="You're not borrowing anything. Spot something on a friend's shelf and ask to borrow it."
         />
       )}
@@ -262,10 +300,6 @@ const styles = StyleSheet.create({
   },
   action: {
     flex: 1,
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginBottom: 16,
   },
   grid: {
     flexDirection: 'row',
