@@ -10,6 +10,7 @@ import { Skeleton, SkeletonText } from '../../../components/Skeleton';
 import { RefreshControl } from '../../../components/RefreshControl';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts } from '../../../lib/theme';
+import type { CopyLendStatus } from '../../../lib/database.types';
 
 interface OtherProfile {
   id: string;
@@ -21,7 +22,7 @@ interface OtherProfile {
 
 interface ShelfItemRow {
   id: string;
-  status: string;
+  lend_status: CopyLendStatus;
   book: { id: string; title: string; cover_url: string | null } | null;
 }
 
@@ -81,7 +82,7 @@ export default function UserProfile() {
         : Promise.resolve({ data: null, error: null }),
       supabase
         .from('shelf_items')
-        .select('id, status, book:books(id, title, cover_url)')
+        .select('id, lend_status, book:books(id, title, cover_url)')
         .eq('owner_id', targetId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false }),

@@ -4,10 +4,15 @@ import { Chip } from './Chip';
 import { prefetchBook } from '../lib/bookDetail';
 import { colors, fonts, organicCorners } from '../lib/theme';
 
+import type { CopyLendStatus } from '../lib/database.types';
+
 interface ShelfGridItem {
   id: string;
-  status: string;
+  lend_status: CopyLendStatus;
   book: { id: string; title: string; cover_url: string | null } | null;
+  // What to call a copy that isn't available. Friends only ever see
+  // "Unavailable" (the default); your own shelf passes "With Sam" etc.
+  label?: string;
 }
 
 interface ShelfGridProps {
@@ -37,16 +42,18 @@ export function ShelfGrid({ items, emptyText }: ShelfGridProps) {
             })
           }
         >
-          {item.book?.cover_url ? (
-            <Image source={{ uri: item.book.cover_url }} style={styles.cover} resizeMode="cover" />
-          ) : (
-            <View style={styles.spinePlaceholder}>
-              <Text style={styles.spineTitle} numberOfLines={5}>
-                {item.book?.title ?? 'Unknown title'}
-              </Text>
-            </View>
-          )}
-          {item.status !== 'available' && <Chip label={item.status.replace('_', ' ')} />}
+          <View style={item.lend_status !== 'available' && styles.faded}>
+            {item.book?.cover_url ? (
+              <Image source={{ uri: item.book.cover_url }} style={styles.cover} resizeMode="cover" />
+            ) : (
+              <View style={styles.spinePlaceholder}>
+                <Text style={styles.spineTitle} numberOfLines={5}>
+                  {item.book?.title ?? 'Unknown title'}
+                </Text>
+              </View>
+            )}
+          </View>
+          {item.lend_status !== 'available' && <Chip label={item.label ?? 'Unavailable'} />}
         </Pressable>
       ))}
     </View>
@@ -62,6 +69,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '31%',
+  },
+  faded: {
+    opacity: 0.45,
   },
   cover: {
     width: '100%',

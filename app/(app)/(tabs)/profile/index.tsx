@@ -7,9 +7,12 @@ import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
 import { ShareAppButton } from '../../../../components/ShareAppButton';
 import { ShelfGrid } from '../../../../components/ShelfGrid';
+import { FilterChip } from '../../../../components/FilterChip';
+import { LoanList, personName } from '../../../../components/profile/LoanList';
 import { Skeleton } from '../../../../components/Skeleton';
 import { RefreshControl } from '../../../../components/RefreshControl';
 import { useRefetchOnVisible, useRefreshing } from '../../../../lib/refresh';
+import { fetchBorrowing, fetchMyCopies, type ActiveLoan, type MyCopy } from '../../../../lib/loans';
 import { colors, fonts, organicCorners } from '../../../../lib/theme';
 
 interface OwnProfile {
@@ -19,10 +22,20 @@ interface OwnProfile {
   bio: string | null;
 }
 
-interface ShelfItemRow {
-  id: string;
-  status: string;
-  book: { id: string; title: string; cover_url: string | null } | null;
+type ShelfTab = 'library' | 'lent' | 'borrowing';
+
+const TABS: { key: ShelfTab; label: string }[] = [
+  { key: 'library', label: 'Library' },
+  { key: 'lent', label: 'Lent out' },
+  { key: 'borrowing', label: 'Borrowing' },
+];
+
+// Your own shelf says who has a copy; friends only ever see "Unavailable".
+function copyLabel(copy: MyCopy) {
+  const borrower = personName(copy.activeLoan?.borrower);
+  if (copy.lend_status === 'promised') return `Promised to ${borrower}`;
+  if (copy.lend_status === 'on_loan') return `With ${borrower}`;
+  return 'Unavailable';
 }
 
 export default function Profile() {
@@ -31,7 +44,9 @@ export default function Profile() {
   const uid = session?.user?.id ?? null;
   const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [friendCount, setFriendCount] = useState(0);
-  const [items, setItems] = useState<ShelfItemRow[]>([]);
+  const [copies, setCopies] = useState<MyCopy[]>([]);
+  const [borrowing, setBorrowing] = useState<ActiveLoan[]>([]);
+  const [tab, setTab] = useState<ShelfTab>('library');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -41,15 +56,12 @@ export default function Profile() {
     }
     setLoading(true);
 
-    const [profileResult, countResult, itemsResult] = await Promise.all([
+    // The loan reads throw (and log) on failure; keep whatever we had.
+    const [profileResult, countResult, copiesResult, borrowingResult] = await Promise.all([
       supabase.from('profiles').select('username, display_name, avatar_url, bio').eq('id', uid).single(),
       supabase.rpc('friend_count', { target: uid }),
-      supabase
-        .from('shelf_items')
-        .select('id, status, book:books(id, title, cover_url)')
-        .eq('owner_id', uid)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false }),
+      fetchMyCopies(uid).catch(() => null),
+      fetchBorrowing(uid).catch(() => null),
     ]);
 
     if (!profileResult.error && profileResult.data) {
@@ -58,9 +70,8 @@ export default function Profile() {
     if (!countResult.error && typeof countResult.data === 'number') {
       setFriendCount(countResult.data);
     }
-    if (!itemsResult.error && itemsResult.data) {
-      setItems(itemsResult.data as unknown as ShelfItemRow[]);
-    }
+    if (copiesResult) setCopies(copiesResult);
+    if (borrowingResult) setBorrowing(borrowingResult);
     setLoading(false);
   }, [uid]);
 
@@ -108,6 +119,10 @@ export default function Profile() {
   }
 
   const name = profile.display_name ?? profile.username;
+  // Lent out comes from the copies' active loans (no extra fetch), newest first.
+  const lentOut = copies
+    .flatMap((copy) => (copy.activeLoan ? [copy.activeLoan] : []))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   return (
     <ScrollView
@@ -119,8 +134,8 @@ export default function Profile() {
         <Avatar avatarUrl={profile.avatar_url} label={name} size={80} />
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statNumber}>{items.length}</Text>
-            <Text style={styles.statLabel}>{items.length === 1 ? 'book' : 'books'}</Text>
+            <Text style={styles.statNumber}>{copies.length}</Text>
+            <Text style={styles.statLabel}>{copies.length === 1 ? 'book' : 'books'}</Text>
           </View>
           <Pressable style={styles.stat} onPress={() => router.push('/profile/friends')}>
             <Text style={styles.statNumber}>{friendCount}</Text>
@@ -152,7 +167,37 @@ export default function Profile() {
         <ShareAppButton style={styles.action} />
       </View>
 
-      <ShelfGrid items={items} emptyText="Your shelf is empty. Add a book to get started." />
+      <View style={styles.tabs}>
+        {TABS.map((t) => (
+          <FilterChip key={t.key} label={t.label} active={tab === t.key} onPress={() => setTab(t.key)} />
+        ))}
+      </View>
+
+      {tab === 'library' && (
+        <ShelfGrid
+          items={copies.map((copy) => ({
+            id: copy.id,
+            lend_status: copy.lend_status,
+            book: copy.book,
+            label: copyLabel(copy),
+          }))}
+          emptyText="Your shelf is empty. Add a book to get started."
+        />
+      )}
+      {tab === 'lent' && (
+        <LoanList
+          loans={lentOut}
+          side="lent"
+          emptyText="Nothing lent out right now. When you say yes to a friend, the book shows up here."
+        />
+      )}
+      {tab === 'borrowing' && (
+        <LoanList
+          loans={borrowing}
+          side="borrowing"
+          emptyText="You're not borrowing anything. Spot something on a friend's shelf and ask to borrow it."
+        />
+      )}
     </ScrollView>
   );
 }
@@ -217,6 +262,10 @@ const styles = StyleSheet.create({
   },
   action: {
     flex: 1,
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginBottom: 16,
   },
   grid: {
     flexDirection: 'row',
