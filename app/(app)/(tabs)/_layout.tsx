@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabBar } from '../../../components/TabBar';
+import { NotificationsBell } from '../../../components/activity/NotificationsBell';
 import { colors, fonts, headerHeight } from '../../../lib/theme';
 
 export default function TabsLayout() {
@@ -15,6 +16,8 @@ export default function TabsLayout() {
         // `height` includes the status-bar inset the header pads itself with.
         headerStyle: { backgroundColor: colors.background, height: insets.top + headerHeight },
         headerShadowVisible: false,
+        // On every tab, so what needs you is one tap away wherever you are.
+        headerRight: () => <NotificationsBell />,
         headerTitleStyle: { fontFamily: fonts.displayItalic, color: colors.text, fontSize: 19 },
         sceneStyle: { backgroundColor: colors.background },
       }}
