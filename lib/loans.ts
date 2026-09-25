@@ -3,7 +3,7 @@ import { log } from './log';
 import type { CopyLendStatus, LoanEndedReason, LoanRequestStatus } from './database.types';
 
 // Lending v2. Every change goes through a database step function (see
-// supabase/migrations/20260924120000_lending_v2_expand.sql), which checks
+// supabase/migrations/20260925020423_lending_v2_expand.sql), which checks
 // who's calling and the copy/loan state and raises a readable message
 // otherwise — so the wrappers below just throw Error(message) for the UI to
 // show. Reads go straight to loans_v2 / loan_requests_v2, which only the

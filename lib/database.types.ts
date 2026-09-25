@@ -7,7 +7,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type FriendshipStatus = 'pending' | 'accepted';
 export type ShelfItemStatus = 'available' | 'requested' | 'on_loan';
 export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
-// Lending v2 (see supabase/migrations/20260924120000_lending_v2_expand.sql).
+// Lending v2 (see supabase/migrations/20260925020423_lending_v2_expand.sql).
 export type CopyLendStatus = 'available' | 'unavailable' | 'promised' | 'on_loan';
 export type LoanEndedReason = 'returned' | 'called_off' | 'removed';
 

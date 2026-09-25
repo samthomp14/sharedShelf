@@ -3,7 +3,7 @@
 -- whose message is the full result log, which aborts (rolls back) everything.
 --
 -- Before the migration is applied: run as one batch
---   begin; <contents of migrations/20260924120000_lending_v2_expand.sql>; <this file>; rollback;
+--   begin; <contents of migrations/20260925020423_lending_v2_expand.sql>; <this file>; rollback;
 -- After it's applied: run just this file. Read the results from the error
 -- message; any line starting with FAIL is a problem.
 do $t$
