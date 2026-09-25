@@ -5,9 +5,8 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type FriendshipStatus = 'pending' | 'accepted';
-export type ShelfItemStatus = 'available' | 'requested' | 'on_loan';
 export type LoanRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
-// Lending v2 (see supabase/migrations/20260925020423_lending_v2_expand.sql).
+// Lending (see supabase/migrations/*_lending_v2_expand.sql).
 export type CopyLendStatus = 'available' | 'unavailable' | 'promised' | 'on_loan';
 export type LoanEndedReason = 'returned' | 'called_off' | 'removed';
 
@@ -224,8 +223,7 @@ export interface Database {
           id: string;
           owner_id: string;
           book_id: string;
-          status: ShelfItemStatus;
-          // Lending v2 copy state. Only the step functions can change it.
+          // Copy state. Only the lending step functions can change it.
           lend_status: CopyLendStatus;
           visibility: 'friends' | 'private';
           group_id: string | null;
@@ -236,7 +234,6 @@ export interface Database {
           id?: string;
           owner_id: string;
           book_id: string;
-          status?: ShelfItemStatus;
           visibility?: 'friends' | 'private';
           group_id?: string | null;
           sort_order?: number;
@@ -245,49 +242,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['shelf_items']['Insert']>;
         Relationships: [];
       };
-      loan_requests: {
-        Row: {
-          id: string;
-          shelf_item_id: string;
-          requester_id: string;
-          status: LoanRequestStatus;
-          created_at: string;
-          responded_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          shelf_item_id: string;
-          requester_id: string;
-          status?: LoanRequestStatus;
-          created_at?: string;
-          responded_at?: string | null;
-        };
-        Update: Partial<Database['public']['Tables']['loan_requests']['Insert']>;
-        Relationships: [];
-      };
-      loans: {
-        Row: {
-          id: string;
-          shelf_item_id: string;
-          loan_request_id: string | null;
-          lender_id: string;
-          borrower_id: string;
-          started_at: string;
-          returned_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          shelf_item_id: string;
-          loan_request_id?: string | null;
-          lender_id: string;
-          borrower_id: string;
-          started_at?: string;
-          returned_at?: string | null;
-        };
-        Update: Partial<Database['public']['Tables']['loans']['Insert']>;
-        Relationships: [];
-      };
-      // Lending v2: read-only for clients (select policy only); all writes
+      // Lending: read-only for clients (select policy only); all writes
       // go through the step functions above.
       loan_requests_v2: {
         Row: {
@@ -299,7 +254,6 @@ export interface Database {
           status: LoanRequestStatus;
           created_at: string;
           responded_at: string | null;
-          legacy_request_id: string | null;
         };
         Insert: never;
         Update: never;
@@ -318,7 +272,6 @@ export interface Database {
           ended_at: string | null;
           ended_reason: LoanEndedReason | null;
           ended_by: string | null;
-          legacy_loan_id: string | null;
         };
         Insert: never;
         Update: never;

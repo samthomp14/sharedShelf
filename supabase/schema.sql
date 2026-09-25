@@ -200,8 +200,8 @@ create policy "either party can delete a friendship"
   to authenticated
   using ((select auth.uid()) = requester_id or (select auth.uid()) = addressee_id);
 
--- Helper: are two users accepted friends? Used inside shelf_items/
--- loan_requests RLS policies, which run as `authenticated` — that role
+-- Helper: are two users accepted friends? Used inside shelf_items RLS
+-- policies and the lending step functions, which run as `authenticated` — that role
 -- keeps EXECUTE, but anonymous callers shouldn't be able to probe
 -- arbitrary user-id pairs via the auto-generated RPC endpoint.
 create function public.are_friends(a uuid, b uuid)
@@ -399,13 +399,15 @@ create policy "owners manage their own shelf groups"
 -- ============================================================
 -- shelf_items: a physical copy a user owns
 -- ============================================================
-create type public.shelf_item_status as enum ('available', 'requested', 'on_loan');
+-- available | unavailable | promised | on_loan. Changed only by the lending
+-- step functions (guard_lend_status, below, blocks direct client writes).
+create type public.copy_lend_status as enum ('available', 'unavailable', 'promised', 'on_loan');
 
 create table public.shelf_items (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.profiles (id) on delete cascade,
   book_id uuid not null references public.books (id) on delete restrict,
-  status public.shelf_item_status not null default 'available',
+  lend_status public.copy_lend_status not null default 'available',
   visibility text not null default 'friends' check (visibility in ('friends', 'private')),
   group_id uuid references public.shelf_groups (id) on delete set null,
   sort_order integer not null default 0,
@@ -641,154 +643,8 @@ $$;
 revoke execute on function public.lookup_isbn(text) from public, anon;
 grant execute on function public.lookup_isbn(text) to authenticated;
 
--- ============================================================
--- loan_requests: a friend asking to borrow a shelf item
--- ============================================================
+-- Status of a loan request (loan_requests_v2, below).
 create type public.loan_request_status as enum ('pending', 'accepted', 'declined', 'cancelled');
-
-create table public.loan_requests (
-  id uuid primary key default gen_random_uuid(),
-  shelf_item_id uuid not null references public.shelf_items (id) on delete cascade,
-  requester_id uuid not null references public.profiles (id) on delete cascade,
-  status public.loan_request_status not null default 'pending',
-  created_at timestamptz not null default now(),
-  responded_at timestamptz
-);
-
-create index loan_requests_shelf_item_id_idx on public.loan_requests (shelf_item_id);
-create index loan_requests_requester_id_idx on public.loan_requests (requester_id);
-
-alter table public.loan_requests enable row level security;
-
-create policy "requester or shelf owner can see a loan request"
-  on public.loan_requests for select
-  to authenticated
-  using (
-    (select auth.uid()) = requester_id
-    or (select auth.uid()) in (
-      select owner_id from public.shelf_items where id = shelf_item_id
-    )
-  );
-
-create policy "friends can request to borrow a visible shelf item"
-  on public.loan_requests for insert
-  to authenticated
-  with check (
-    (select auth.uid()) = requester_id
-    and exists (
-      select 1 from public.shelf_items
-      where id = shelf_item_id
-        and status = 'available'
-        and public.are_friends((select auth.uid()), owner_id)
-    )
-  );
-
-create policy "requester or shelf owner can update a loan request"
-  on public.loan_requests for update
-  to authenticated
-  using (
-    (select auth.uid()) = requester_id
-    or (select auth.uid()) in (
-      select owner_id from public.shelf_items where id = shelf_item_id
-    )
-  );
-
--- ============================================================
--- loans: an active (or completed) hand-off of a shelf item
--- ============================================================
-create table public.loans (
-  id uuid primary key default gen_random_uuid(),
-  shelf_item_id uuid not null references public.shelf_items (id) on delete cascade,
-  loan_request_id uuid references public.loan_requests (id) on delete set null,
-  lender_id uuid not null references public.profiles (id) on delete cascade,
-  borrower_id uuid not null references public.profiles (id) on delete cascade,
-  started_at timestamptz not null default now(),
-  returned_at timestamptz
-);
-
-create index loans_shelf_item_id_idx on public.loans (shelf_item_id);
-create index loans_loan_request_id_idx on public.loans (loan_request_id);
-create index loans_lender_id_idx on public.loans (lender_id);
-create index loans_borrower_id_idx on public.loans (borrower_id);
-
-alter table public.loans enable row level security;
-
-create policy "lender or borrower can see a loan"
-  on public.loans for select
-  to authenticated
-  using ((select auth.uid()) = lender_id or (select auth.uid()) = borrower_id);
-
-create policy "lender can create a loan for their own shelf item"
-  on public.loans for insert
-  to authenticated
-  with check ((select auth.uid()) = lender_id);
-
-create policy "lender or borrower can update a loan (e.g. mark returned)"
-  on public.loans for update
-  to authenticated
-  using ((select auth.uid()) = lender_id or (select auth.uid()) = borrower_id);
-
--- ============================================================
--- Lifecycle triggers: keep shelf_items.status in sync with the
--- loan_request/loan lifecycle so the client never has to juggle
--- multi-table writes (or hit RLS walls — the requester doesn't own
--- the shelf item, so they can't flip its status themselves).
--- ============================================================
-
--- On a new loan_request: mark the shelf item 'requested'.
--- On accept: mark it 'on_loan' and create the loans row.
--- On decline/cancel: mark it 'available' again.
-create function public.handle_loan_request_change()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  if TG_OP = 'INSERT' then
-    update public.shelf_items set status = 'requested' where id = new.shelf_item_id;
-    return new;
-  end if;
-
-  if TG_OP = 'UPDATE' and new.status is distinct from old.status then
-    if new.status = 'accepted' then
-      update public.shelf_items set status = 'on_loan' where id = new.shelf_item_id;
-      insert into public.loans (shelf_item_id, loan_request_id, lender_id, borrower_id)
-      select new.shelf_item_id, new.id, owner_id, new.requester_id
-      from public.shelf_items where id = new.shelf_item_id;
-    elsif new.status in ('declined', 'cancelled') then
-      update public.shelf_items set status = 'available' where id = new.shelf_item_id;
-    end if;
-  end if;
-
-  return new;
-end;
-$$;
-
-create trigger on_loan_request_change
-  after insert or update on public.loan_requests
-  for each row execute procedure public.handle_loan_request_change();
-
-revoke execute on function public.handle_loan_request_change() from public, anon, authenticated;
-
--- When a loan is marked returned, free up the shelf item again.
-create function public.handle_loan_returned()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  if new.returned_at is not null and old.returned_at is null then
-    update public.shelf_items set status = 'available' where id = new.shelf_item_id;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger on_loan_returned
-  after update on public.loans
-  for each row execute procedure public.handle_loan_returned();
-
-revoke execute on function public.handle_loan_returned() from public, anon, authenticated;
 
 -- ============================================================
 -- client_logs: errors reported by the app (mainly the iPhone
@@ -817,17 +673,10 @@ create policy "users can report their own client logs"
   with check (user_id = (select auth.uid()));
 
 -- ============================================================
--- Lending v2 (expand step). Copied from
--- migrations/20260925020423_lending_v2_expand.sql — see its header for the
--- expand/contract plan and switch-over steps. On a fresh project the
--- backfill call at the end is a no-op.
+-- Lending: requests, loans and the step functions that move a copy
+-- through available -> promised -> on_loan -> available. From
+-- migrations/*_lending_v2_expand.sql and *_lending_v2_contract.sql.
 -- ============================================================
-
-create type public.copy_lend_status as enum ('available', 'unavailable', 'promised', 'on_loan');
-
--- Metadata-only on PG17 (constant default), no table rewrite.
-alter table public.shelf_items
-  add column lend_status public.copy_lend_status not null default 'available';
 
 -- ------------------------------------------------------------
 -- loan_requests_v2: a friend asking to borrow a copy
@@ -843,7 +692,6 @@ create table public.loan_requests_v2 (
   status public.loan_request_status not null default 'pending',
   created_at timestamptz not null default now(),
   responded_at timestamptz,
-  legacy_request_id uuid unique, -- old loan_requests.id, set by the backfill
   constraint loan_requests_v2_not_own_copy check (owner_id <> requester_id)
 );
 
@@ -878,7 +726,6 @@ create table public.loans_v2 (
   ended_at timestamptz,
   ended_reason text,
   ended_by uuid references public.profiles (id) on delete set null,
-  legacy_loan_id uuid unique, -- old loans.id, set by the backfill
   constraint loans_v2_not_own_copy check (owner_id <> borrower_id),
   constraint loans_v2_ended_reason_check
     check (ended_reason is null or ended_reason in ('returned', 'called_off', 'removed')),
@@ -912,11 +759,10 @@ grant select on public.loan_requests_v2, public.loans_v2 to authenticated;
 
 -- ------------------------------------------------------------
 -- Guard: lend_status only changes through the step functions.
--- Owners have a FOR ALL policy on shelf_items (production uses it for sort
+-- Owners have a FOR ALL policy on shelf_items (the app uses it for sort
 -- order, groups, delete), so without this they could PATCH lend_status
 -- directly. The step functions are security definer, so inside them
--- current_user is the definer, not authenticated/anon. Old code never sets
--- lend_status, so this never fires for it.
+-- current_user is the definer, not authenticated/anon.
 -- ------------------------------------------------------------
 create function public.guard_lend_status()
 returns trigger
@@ -946,7 +792,7 @@ revoke execute on function public.guard_lend_status() from public, anon, authent
 -- active v2 loan with 'removed' and decline its pending v2 requests, before
 -- the FKs null out shelf_item_id. Rows keep book_id/owner_id so the
 -- borrower's feed can say "X removed <book> from their shelf. The loan's
--- closed." Old tables are untouched (they still cascade as before).
+-- closed."
 -- ------------------------------------------------------------
 create function public.handle_shelf_item_removed_v2()
 returns trigger
@@ -1341,86 +1187,3 @@ grant execute on function public.mark_handed_over(uuid) to authenticated;
 grant execute on function public.lend_to_friend(uuid, uuid) to authenticated;
 grant execute on function public.mark_returned(uuid) to authenticated;
 grant execute on function public.set_copy_available(uuid, boolean) to authenticated;
-
--- ============================================================
--- backfill_lending_v2(): copy the old model into the new one.
---
--- IDEMPOTENT and meant to be run MORE THAN ONCE: now (in this migration),
--- and again at switch-over to pick up rows production wrote to the old
--- tables in the meantime (see SWITCH-OVER at the top). Run as postgres /
--- service role only; clients can't execute it.
---
---   * Every old loan_request -> loan_requests_v2 (keyed by
---     legacy_request_id), status mirrored. So the old 'requested' copies'
---     pending requests arrive as pending, on a copy that's now available.
---   * Every old loan -> loans_v2 (keyed by legacy_loan_id).
---     handed_over_at = created_at = started_at. Returned ones get
---     ended_at = returned_at, ended_reason 'returned'. A loan returned on
---     prod since the last run gets closed on the next run.
---   * lend_status recomputed from active v2 loans: promised/on_loan where
---     there is one; any other promised/on_loan copy -> available. Old
---     'requested' and 'available' copies stay available (the default);
---     'unavailable' set through v2 is left alone.
--- ============================================================
-create function public.backfill_lending_v2()
-returns table (requests_upserted bigint, loans_upserted bigint, copies_updated bigint)
-language plpgsql
-set search_path = ''
-as $$
-declare
-  v_req bigint;
-  v_loans bigint;
-  v_a bigint;
-  v_b bigint;
-begin
-  insert into public.loan_requests_v2
-    (shelf_item_id, book_id, owner_id, requester_id, status, created_at, responded_at, legacy_request_id)
-  select r.shelf_item_id, s.book_id, s.owner_id, r.requester_id, r.status, r.created_at, r.responded_at, r.id
-  from public.loan_requests r
-  join public.shelf_items s on s.id = r.shelf_item_id
-  where s.owner_id <> r.requester_id
-  on conflict (legacy_request_id) do update
-    set status = excluded.status, responded_at = excluded.responded_at
-    where (public.loan_requests_v2.status, public.loan_requests_v2.responded_at)
-      is distinct from (excluded.status, excluded.responded_at);
-  get diagnostics v_req = row_count;
-
-  insert into public.loans_v2
-    (shelf_item_id, book_id, owner_id, borrower_id, request_id, created_at, handed_over_at,
-     ended_at, ended_reason, ended_by, legacy_loan_id)
-  select l.shelf_item_id, s.book_id, l.lender_id, l.borrower_id, rq.id, l.started_at, l.started_at,
-         l.returned_at,
-         case when l.returned_at is not null then 'returned' end,
-         case when l.returned_at is not null then l.lender_id end,
-         l.id
-  from public.loans l
-  join public.shelf_items s on s.id = l.shelf_item_id
-  left join public.loan_requests_v2 rq on rq.legacy_request_id = l.loan_request_id
-  where l.lender_id <> l.borrower_id
-  on conflict (legacy_loan_id) do update
-    set ended_at = excluded.ended_at, ended_reason = excluded.ended_reason, ended_by = excluded.ended_by
-    where public.loans_v2.ended_at is null and excluded.ended_at is not null;
-  get diagnostics v_loans = row_count;
-
-  update public.shelf_items s
-  set lend_status = case when l.handed_over_at is null then 'promised' else 'on_loan' end::public.copy_lend_status
-  from public.loans_v2 l
-  where l.shelf_item_id = s.id and l.ended_at is null
-    and s.lend_status is distinct from
-        (case when l.handed_over_at is null then 'promised' else 'on_loan' end)::public.copy_lend_status;
-  get diagnostics v_a = row_count;
-
-  update public.shelf_items s
-  set lend_status = 'available'
-  where s.lend_status in ('promised', 'on_loan')
-    and not exists (select 1 from public.loans_v2 l where l.shelf_item_id = s.id and l.ended_at is null);
-  get diagnostics v_b = row_count;
-
-  return query select v_req, v_loans, v_a + v_b;
-end;
-$$;
-
-revoke execute on function public.backfill_lending_v2() from public, anon, authenticated;
-
--- First run.
-select * from public.backfill_lending_v2();

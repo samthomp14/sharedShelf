@@ -2,29 +2,18 @@
 -- it creates throwaway users/books/copies and ends by raising an exception
 -- whose message is the full result log, which aborts (rolls back) everything.
 --
--- Before the migration is applied: run as one batch
---   begin; <contents of migrations/20260925020423_lending_v2_expand.sql>; <this file>; rollback;
--- After it's applied: run just this file. Read the results from the error
--- message; any line starting with FAIL is a problem.
+-- Run this file on its own (SQL editor or execute_sql). Read the results from
+-- the error message; any line starting with FAIL is a problem.
 do $t$
 declare
   o uuid := gen_random_uuid(); a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid();
-  bk uuid; c1 uuid; c2 uuid; c3 uuid; c4 uuid; c5 uuid;
-  ra uuid; rb uuid; r3 uuid; lid uuid; l2 uuid; l3 uuid; l4 uuid; oldreq uuid;
+  bk uuid; c1 uuid; c2 uuid; c3 uuid; c4 uuid;
+  ra uuid; rb uuid; r3 uuid; lid uuid; l2 uuid; l3 uuid; l4 uuid;
   n int; s text; msg text := E'\n';
-  bf record;
 begin
-  -- baseline: first backfill (from the migration) on real data
-  select count(*) filter (where status='pending') || ' pending / ' || count(*) || ' total' into s from public.loan_requests_v2;
-  msg := msg || 'real v2 requests: ' || s || E'\n';
-  select count(*) filter (where ended_at is null and handed_over_at is not null) || ' active handed-over / ' || count(*) filter (where ended_reason='returned') || ' returned / ' || count(*) || ' total' into s from public.loans_v2;
-  msg := msg || 'real v2 loans: ' || s || E'\n';
+  -- baseline: live copy states
   select string_agg(lend_status || '=' || cnt, ', ') into s from (select lend_status, count(*) cnt from public.shelf_items group by 1) x;
   msg := msg || 'real lend_status: ' || s || E'\n';
-  select string_agg(status || '=' || cnt, ', ') into s from (select status, count(*) cnt from public.shelf_items group by 1) x;
-  msg := msg || 'real old status (unchanged?): ' || s || E'\n';
-  select * into bf from public.backfill_lending_v2();
-  msg := msg || 'backfill rerun on real data: ' || bf::text || E'\n';
 
   -- fixtures (as postgres)
   insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data) values
@@ -41,8 +30,6 @@ begin
   insert into public.shelf_items (owner_id, book_id) values (o, bk) returning id into c3;
   insert into public.books (title, source) values ('ZZ Test Book 4', 'manual') returning id into bk;
   insert into public.shelf_items (owner_id, book_id) values (o, bk) returning id into c4;
-  insert into public.books (title, source) values ('ZZ Test Book 5', 'manual') returning id into bk;
-  insert into public.shelf_items (owner_id, book_id) values (o, bk) returning id into c5;
 
   -- ===== 1. requests =====
   perform set_config('role', 'authenticated', true);
@@ -198,28 +185,6 @@ begin
   exception when others then msg := msg || '7a anon rpc -> ' || sqlstate || ' ' || sqlerrm || E'\n'; end;
   begin perform count(*) from public.loans_v2; msg := msg || 'FAIL 7b anon read' || E'\n';
   exception when others then msg := msg || '7b anon select -> ' || sqlstate || ' ' || sqlerrm || E'\n'; end;
-  perform set_config('role', 'authenticated', true);
-  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  begin perform public.backfill_lending_v2(); msg := msg || 'FAIL 7c client ran backfill' || E'\n';
-  exception when others then msg := msg || '7c client backfill -> ' || sqlstate || ' ' || sqlerrm || E'\n'; end;
-
-  -- ===== 8. old path still works alongside + backfill catch-up =====
-  insert into public.loan_requests (shelf_item_id, requester_id) values (c5, a) returning id into oldreq;
-  perform set_config('request.jwt.claims', json_build_object('sub', o, 'role', 'authenticated')::text, true);
-  msg := msg || '8a old request: status=' || (select status || ' lend_status=' || lend_status from public.shelf_items where id = c5) || E'\n';
-  update public.loan_requests set status = 'accepted', responded_at = now() where id = oldreq;
-  msg := msg || '8b old accept: status=' || (select status || ' lend_status=' || lend_status from public.shelf_items where id = c5) || ' old loans=' || (select count(*) from public.loans where shelf_item_id = c5) || E'\n';
-  perform set_config('role', 'postgres', true);
-  select * into bf from public.backfill_lending_v2();
-  msg := msg || '8c backfill: ' || bf::text || ' lend_status=' || (select lend_status from public.shelf_items where id = c5) || ' v2 loan handed=' || (select (handed_over_at is not null) || ' req_linked=' || (request_id is not null) from public.loans_v2 where shelf_item_id = c5) || E'\n';
-  select * into bf from public.backfill_lending_v2();
-  msg := msg || '8d backfill again (expect 0,0,0): ' || bf::text || E'\n';
-  perform set_config('role', 'authenticated', true);
-  update public.loans set returned_at = now() where shelf_item_id = c5;
-  msg := msg || '8e old return: status=' || (select status from public.shelf_items where id = c5) || E'\n';
-  perform set_config('role', 'postgres', true);
-  select * into bf from public.backfill_lending_v2();
-  msg := msg || '8f backfill after old return: ' || bf::text || ' lend_status=' || (select lend_status from public.shelf_items where id = c5) || ' v2=' || (select ended_reason from public.loans_v2 where shelf_item_id = c5) || E'\n';
 
   raise exception 'TEST RESULTS (rolled back): %', msg;
 end
