@@ -17,6 +17,7 @@ export interface BookCopy {
   id: string;
   owner_id: string;
   lend_status: CopyLendStatus;
+  created_at: string; // when it went on the owner's shelf
   owner: Person | null;
 }
 
@@ -29,6 +30,8 @@ export interface BookLoan {
   borrower_id: string;
   created_at: string;
   handed_over_at: string | null;
+  // The request it came from, for the "asked" step; null for a direct lend.
+  request: { created_at: string } | null;
   owner: Person | null;
   borrower: Person | null;
 }
@@ -59,12 +62,12 @@ async function fetchBookDetail(id: string): Promise<BookDetail> {
     supabase.from('books').select('id, title, authors, cover_url').eq('id', id).single(),
     supabase
       .from('shelf_items')
-      .select(`id, owner_id, lend_status, owner:profiles(${PERSON})`)
+      .select(`id, owner_id, lend_status, created_at, owner:profiles(${PERSON})`)
       .eq('book_id', id),
     supabase
       .from('loans_v2')
       .select(
-        `id, shelf_item_id, owner_id, borrower_id, created_at, handed_over_at, owner:profiles!loans_v2_owner_id_fkey(${PERSON}), borrower:profiles!loans_v2_borrower_id_fkey(${PERSON})`
+        `id, shelf_item_id, owner_id, borrower_id, created_at, handed_over_at, request:loan_requests_v2!loans_v2_request_id_fkey(created_at), owner:profiles!loans_v2_owner_id_fkey(${PERSON}), borrower:profiles!loans_v2_borrower_id_fkey(${PERSON})`
       )
       .eq('book_id', id)
       .is('ended_at', null),

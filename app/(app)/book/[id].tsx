@@ -8,33 +8,26 @@ import {
   type BookLoan,
   type BookRequest,
 } from '../../../lib/bookDetail';
-import { cancelRequest, lendToFriend, personName, requestLoan, type Person } from '../../../lib/loans';
+import { lendToFriend, personName, type Person } from '../../../lib/loans';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Chip } from '../../../components/Chip';
-import { Button } from '../../../components/Button';
 import { AuthorList } from '../../../components/AuthorList';
 import { Skeleton } from '../../../components/Skeleton';
 import { RefreshControl } from '../../../components/RefreshControl';
 import { ToastProvider, useToast } from '../../../components/Toast';
-import { BorrowingCard, OwnedCopyCard, type RunStep } from '../../../components/book/YourCopyCard';
+import {
+  BorrowingCard,
+  OwnedCopyCard,
+  RequestCard,
+  type RunStep,
+} from '../../../components/book/YourCopyCard';
+import { FriendCopies, FriendCopiesSkeleton } from '../../../components/book/FriendCopies';
 import { FriendPicker } from '../../../components/book/FriendPicker';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
-function CopiesSkeleton() {
-  return (
-    <>
-      {[0, 1].map((i) => (
-        <View key={i} style={styles.copyRow}>
-          <Skeleton width="45%" height={16} />
-        </View>
-      ))}
-    </>
-  );
-}
-
-// One page for everyone: a "Your copy" card on top for each copy you own or
-// are borrowing/picking up, then the book and every copy you can see.
+// One page for everyone: the book up top, then a card for each copy you're
+// involved with (yours, one you're borrowing or picking up, or one you've
+// asked for), then the friends' copies you can see.
 export default function BookDetailScreen() {
   return (
     <ToastProvider>
@@ -128,10 +121,13 @@ function BookDetail() {
   }
 
   const myCopies = copies.filter((c) => c.owner_id === uid);
+  const friendCopies = copies.filter((c) => c.owner_id !== uid);
   const borrowing = loans.filter((l) => l.borrower_id === uid);
+  const myRequests = requests.filter((r) => r.requester_id === uid);
   const loanFor = (copyId: string) => loans.find((l) => l.shelf_item_id === copyId) ?? null;
-  const myRequestFor = (copyId: string) =>
-    requests.find((r) => r.shelf_item_id === copyId && r.requester_id === uid) ?? null;
+  const ownerOf = (copyId: string | null) => copies.find((c) => c.id === copyId)?.owner ?? null;
+  // Your oldest copy, for the "On your shelf since" line.
+  const shelvedAt = myCopies.map((c) => c.created_at).sort()[0];
 
   // No placeholder to paint from (a direct/deep link, not tapped from a
   // list) — skeleton the whole layout until the first fetch lands.
@@ -139,12 +135,13 @@ function BookDetail() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Skeleton width={160} height={240} style={styles.coverSkeleton} />
-          <Skeleton width="70%" height={21} style={styles.titleSkeleton} />
-          <Skeleton width="40%" height={15} style={styles.authorsSkeleton} />
+          <Skeleton width={104} height={156} style={organicCorners} />
+          <View style={styles.headerText}>
+            <Skeleton width="85%" height={20} />
+            <Skeleton width="55%" height={15} />
+          </View>
         </View>
-        <Text style={styles.sectionTitle}>Copies you can see</Text>
-        <CopiesSkeleton />
+        <FriendCopiesSkeleton />
       </ScrollView>
     );
   }
@@ -163,6 +160,27 @@ function BookDetail() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      <View style={styles.header}>
+        {book.cover_url ? (
+          <Image source={{ uri: book.cover_url }} style={styles.cover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cover, styles.spinePlaceholder]}>
+            <Text style={styles.spineTitle} numberOfLines={6}>
+              {book.title}
+            </Text>
+          </View>
+        )}
+        <View style={styles.headerText}>
+          <Text style={styles.title}>{book.title}</Text>
+          {bookLoaded ? (
+            <AuthorList authors={book.authors} textStyle={styles.authors} />
+          ) : (
+            <Skeleton width="55%" height={15} />
+          )}
+          {shelvedAt && <Text style={styles.shelvedAt}>On your shelf since {shelfMonth(shelvedAt)}</Text>}
+        </View>
+      </View>
+
       {myCopies.map((copy) => (
         <OwnedCopyCard
           key={copy.id}
@@ -177,76 +195,27 @@ function BookDetail() {
       {borrowing.map((loan) => (
         <BorrowingCard key={loan.id} loan={loan} busy={busy} run={run} />
       ))}
+      {myRequests.map((request) => (
+        <RequestCard
+          key={request.id}
+          request={request}
+          owner={ownerOf(request.shelf_item_id)}
+          busy={busy}
+          run={run}
+        />
+      ))}
 
-      <View style={styles.header}>
-        {book.cover_url ? (
-          <Image source={{ uri: book.cover_url }} style={styles.cover} resizeMode="cover" />
-        ) : (
-          <View style={styles.spinePlaceholder}>
-            <Text style={styles.spineTitle} numberOfLines={6}>
-              {book.title}
-            </Text>
-          </View>
-        )}
-        <Text style={styles.title}>{book.title}</Text>
-        {bookLoaded ? (
-          <AuthorList authors={book.authors} textStyle={styles.authors} />
-        ) : (
-          <Skeleton width="40%" height={15} style={styles.authorsSkeleton} />
-        )}
-      </View>
-
-      <Text style={styles.sectionTitle}>Copies you can see</Text>
       {!copiesLoaded ? (
-        <CopiesSkeleton />
-      ) : copies.length === 0 ? (
-        <Text style={styles.emptyBody}>
-          No one in your circle has this on their shelf yet.
-        </Text>
+        <FriendCopiesSkeleton />
       ) : (
-        copies.map((copy) => {
-          const isMine = copy.owner_id === uid;
-          const myLoan = isMine ? null : loanFor(copy.id);
-          const myRequest = isMine ? null : myRequestFor(copy.id);
-          // Friends' copies that are promised, lent or held back all read
-          // "Unavailable" — who has it is only for the two people involved.
-          const faded = !isMine && !myLoan && copy.lend_status !== 'available';
-          return (
-            <View key={copy.id} style={[styles.copyRow, faded && styles.copyRowFaded]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.copyOwner}>{isMine ? 'You' : personName(copy.owner)}</Text>
-              </View>
-              {isMine ? (
-                <Chip label={ownLabel(copy.lend_status)} />
-              ) : myLoan ? (
-                <Chip label={myLoan.handed_over_at ? 'Borrowing' : 'Promised to you'} />
-              ) : copy.lend_status !== 'available' ? (
-                <Chip label="Unavailable" />
-              ) : myRequest ? (
-                <>
-                  <Chip label="Requested" />
-                  <Button
-                    title="Cancel"
-                    variant="secondary"
-                    onPress={() => run(`cancel-${myRequest.id}`, () => cancelRequest(myRequest.id), 'Request cancelled')}
-                    loading={busy === `cancel-${myRequest.id}`}
-                    disabled={busy !== null}
-                  />
-                </>
-              ) : (
-                <Button
-                  title="Ask to borrow"
-                  variant="secondary"
-                  onPress={() =>
-                    run(`request-${copy.id}`, () => requestLoan(copy.id), `Asked ${personName(copy.owner)}`)
-                  }
-                  loading={busy === `request-${copy.id}`}
-                  disabled={busy !== null}
-                />
-              )}
-            </View>
-          );
-        })
+        <FriendCopies
+          copies={friendCopies}
+          loans={borrowing}
+          requests={myRequests}
+          ownsCopy={myCopies.length > 0}
+          busy={busy}
+          run={run}
+        />
       )}
 
       {uid && (
@@ -261,92 +230,56 @@ function BookDetail() {
   );
 }
 
-// Your own copy's state, as a short tag in the list (the card has the detail).
-function ownLabel(status: BookCopy['lend_status']): string {
-  switch (status) {
-    case 'available':
-      return 'Available';
-    case 'unavailable':
-      return 'Unavailable';
-    case 'promised':
-      return 'Promised';
-    case 'on_loan':
-      return 'Lent out';
-  }
+// "March", or "March 2023" outside the current year.
+function shelfMonth(iso: string): string {
+  const date = new Date(iso);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, { month: 'long', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, flexGrow: 1 },
   header: {
-    alignItems: 'center',
-    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 16,
+    marginBottom: 20,
   },
+  headerText: { flex: 1, gap: 6, paddingBottom: 4 },
   cover: {
-    width: 160,
-    height: 240,
+    width: 104,
+    height: 156,
     backgroundColor: colors.chipBackground,
-    marginBottom: 16,
     overflow: 'hidden',
     ...organicCorners,
   },
   spinePlaceholder: {
-    width: 160,
-    height: 240,
-    backgroundColor: colors.chipBackground,
-    marginBottom: 16,
-    padding: 12,
+    padding: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    ...organicCorners,
   },
   spineTitle: {
     fontFamily: fonts.display,
-    fontSize: 14,
+    fontSize: 11,
     color: colors.text,
     textAlign: 'center',
   },
   title: {
     fontFamily: fonts.displaySemibold,
-    fontSize: 21,
+    fontSize: 20,
+    lineHeight: 25,
     color: colors.text,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  titleSkeleton: {
-    marginBottom: 8,
-  },
-  coverSkeleton: {
-    marginBottom: 16,
-    ...organicCorners,
   },
   authors: {
     fontSize: 15,
     color: colors.textMuted,
-    textAlign: 'center',
   },
-  authorsSkeleton: {
-    marginTop: 4,
+  shelvedAt: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textFaint,
   },
-  sectionTitle: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  copyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  copyRowFaded: { opacity: 0.5 },
-  copyOwner: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   emptyBody: {
     fontFamily: fonts.regular,
     fontSize: 14,
