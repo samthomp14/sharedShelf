@@ -1,0 +1,33 @@
+components/ShelfGrid.tsx
+  s_e1e29242a325ce::t_ce1860eddbfdfc 7-8,11,13-15,45,55-56,73-74
+  s_e1e29242a325ce::t_04e463de8c1276 46-54
+  s_e1e29242a325ce::t_fbc63ccca83ecd 75
+app/(app)/profile/[username].tsx
+  s_e1e29242a325ce::t_c0c19279376733 13,25,85
+components/profile/LoanList.tsx
+  s_e1e29242a325ce::t_cdbc796919bf1b 1-143
+app/(app)/(tabs)/profile/index.tsx
+  s_e1e29242a325ce::t_7a822b0839d836 10-11,15,25-38,47-49,59-60,63-64,73-74,122-125,137-138,170-200,266-268
+  s_e1e29242a325ce::t_ac4760b8cbdeaa 269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "02798aeb581efe22f64250e023c873a207d938c2",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
