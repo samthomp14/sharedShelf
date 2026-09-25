@@ -30,10 +30,20 @@ function formatDate(iso: string): string {
   });
 }
 
-function Card({ status, detail, children }: { status: string; detail?: string; children?: ReactNode }) {
+function Card({
+  label = 'Your copy',
+  status,
+  detail,
+  children,
+}: {
+  label?: string;
+  status: string;
+  detail?: string;
+  children?: ReactNode;
+}) {
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>Your copy</Text>
+      <Text style={styles.label}>{label}</Text>
       <Text style={styles.status}>{status}</Text>
       {detail && <Text style={styles.detail}>{detail}</Text>}
       {children}
@@ -175,12 +185,12 @@ export function BorrowingCard({ loan, busy, run }: BorrowingCardProps) {
 
   if (loan.handed_over_at) {
     return (
-      <Card status={`Borrowing from ${ownerName}`} detail={`Since ${formatDate(loan.handed_over_at)}`} />
+      <Card label="Borrowing" status={`Borrowing from ${ownerName}`} detail={`Since ${formatDate(loan.handed_over_at)}`} />
     );
   }
 
   return (
-    <Card status={`Pick up from ${ownerName}`} detail={`Tap "Got it" once it's in your hands.`}>
+    <Card label="Borrowing" status={`Pick up from ${ownerName}`} detail={`Tap "Got it" once it's in your hands.`}>
       <View style={styles.actions}>
         <Button
           title="Got it"
