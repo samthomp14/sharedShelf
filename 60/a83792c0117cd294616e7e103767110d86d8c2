@@ -1,0 +1,24 @@
+components/book/YourCopyCard.tsx
+  s_e1e29242a325ce::t_cbac269964d8ad 33-43,46,188,193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "60a83792c0117cd294616e7e103767110d86d8c2",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
