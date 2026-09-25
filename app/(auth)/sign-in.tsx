@@ -102,12 +102,13 @@ export default function SignIn() {
         setMessage({ type: 'error', text: friendlyError(error.message) });
       } else if (!data.session) {
         // Email confirmation is required — signUp succeeded but there's no
-        // session yet. Tell the user to go check their inbox.
+        // session yet. Tell the user to go check their inbox. switchMode
+        // clears the message, so set it afterwards.
+        switchMode('sign-in');
         setMessage({
           type: 'success',
           text: `We sent a confirmation link to ${email}. Click it, then sign in below.`,
         });
-        switchMode('sign-in');
       }
       // If data.session is set, confirmation is disabled on this project and
       // the AuthProvider's onAuthStateChange listener will pick up the new
