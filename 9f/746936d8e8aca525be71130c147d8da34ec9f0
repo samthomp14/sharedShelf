@@ -1,0 +1,26 @@
+lib/database.types.ts
+  s_e1e29242a325ce::t_a3555a04f4beb4 9,226,245
+supabase/tests/lending_v2_rollback_test.sql
+  s_e1e29242a325ce::t_cab92c857b8491 5-6,10-11,14
+supabase/schema.sql
+  s_e1e29242a325ce::t_53e1b2593e6099 203-204,402-404,410,646,676-678
+  s_e1e29242a325ce::t_b415331d6d8527 762,765,795
+supabase/migrations/20260925023252_lending_v2_contract.sql
+  s_e1e29242a325ce::t_77b20e7c597610 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f746936d8e8aca525be71130c147d8da34ec9f0",
+  "prompts": {},
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
