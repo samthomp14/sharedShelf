@@ -11,6 +11,7 @@ import {
   fetchLoanActivity,
   markHandedOver,
   markReturned,
+  personName,
   type ActiveLoan,
   type LoanFeedEvent,
   type PendingRequest,
@@ -25,7 +26,7 @@ import { RefreshControl } from '../../../components/RefreshControl';
 import { ShareAppButton } from '../../../components/ShareAppButton';
 import { ToastProvider, useToast } from '../../../components/Toast';
 import { LoanEventText } from '../../../components/activity/LoanEventText';
-import { BookLink, PersonLink, personName } from '../../../components/activity/links';
+import { BookLink, PersonLink } from '../../../components/activity/links';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { timeAgo } from '../../../lib/time';
 import { colors, fonts, radius } from '../../../lib/theme';

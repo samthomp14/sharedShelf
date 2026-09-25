@@ -6,9 +6,10 @@ import {
   declineRequest,
   markHandedOver,
   markReturned,
+  personName,
   setCopyAvailable,
 } from '../../lib/loans';
-import { personName, type BookCopy, type BookLoan, type BookRequest } from '../../lib/bookDetail';
+import type { BookCopy, BookLoan, BookRequest } from '../../lib/bookDetail';
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
 import { colors, fonts, radius } from '../../lib/theme';

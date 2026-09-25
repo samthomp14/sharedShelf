@@ -1,12 +1,8 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { prefetchBook } from '../../lib/bookDetail';
-import type { ActiveLoan, Person } from '../../lib/loans';
+import { personName, type ActiveLoan } from '../../lib/loans';
 import { colors, fonts, organicCorners } from '../../lib/theme';
-
-export function personName(p: Person | null | undefined) {
-  return p?.display_name ?? p?.username ?? 'Someone';
-}
 
 // "12 Sep", or "12 Sep 2025" when it's not this year.
 export function shortDate(iso: string) {

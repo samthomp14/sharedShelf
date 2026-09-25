@@ -3,13 +3,12 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   loadBookDetail,
-  personName,
   type BookCopy,
   type BookInfo,
   type BookLoan,
   type BookRequest,
 } from '../../../lib/bookDetail';
-import { cancelRequest, lendToFriend, requestLoan, type Person } from '../../../lib/loans';
+import { cancelRequest, lendToFriend, personName, requestLoan, type Person } from '../../../lib/loans';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';

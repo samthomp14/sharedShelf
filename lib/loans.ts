@@ -19,6 +19,17 @@ export interface Person {
   avatar_url: string | null;
 }
 
+type Named = Pick<Person, 'username' | 'display_name'> | null | undefined;
+
+export function personName(p: Named): string {
+  return p?.display_name ?? p?.username ?? 'Someone';
+}
+
+// For tight spots like the label under a cover: "Sam", not "Sam Thompson".
+export function firstName(p: Named): string {
+  return personName(p).split(' ')[0];
+}
+
 export interface BookRef {
   id: string;
   title: string;

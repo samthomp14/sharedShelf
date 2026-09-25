@@ -1,13 +1,10 @@
 import type { Href } from 'expo-router';
 import { InlineLink } from '../InlineLink';
 import { prefetchBook } from '../../lib/bookDetail';
+import { personName } from '../../lib/loans';
 import { profileHref } from '../../lib/profileHref';
 
 // Inline name / book-title links for Activity feed lines.
-
-export function personName(p: { username: string; display_name: string | null } | null | undefined) {
-  return p?.display_name ?? p?.username ?? 'Someone';
-}
 
 export function bookHref(id: string, title: string, coverUrl: string | null): Href {
   return { pathname: '/book/[id]', params: { id, title, coverUrl: coverUrl ?? '' } };

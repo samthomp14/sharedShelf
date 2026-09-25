@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { prefetch, consumePrefetch, clearPrefetch } from './prefetch';
 import type { CopyLendStatus } from './database.types';
-import type { Person } from './loans';
+import { personName, type Person } from './loans';
 
 const PERSON = 'id, username, display_name, avatar_url';
 
@@ -121,8 +121,4 @@ export async function fetchFriends(uid: string): Promise<Person[]> {
     .map((row) => (row.requester_id === uid ? row.addressee : row.requester) as Person | null)
     .filter((p): p is Person => !!p)
     .sort((a, b) => personName(a).localeCompare(personName(b)));
-}
-
-export function personName(p: Person | null | undefined): string {
-  return p?.display_name ?? p?.username ?? 'someone';
 }

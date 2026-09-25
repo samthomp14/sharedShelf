@@ -8,11 +8,11 @@ import { Button } from '../../../../components/Button';
 import { ShareAppButton } from '../../../../components/ShareAppButton';
 import { ShelfGrid } from '../../../../components/ShelfGrid';
 import { FilterChip } from '../../../../components/FilterChip';
-import { LoanList, personName } from '../../../../components/profile/LoanList';
+import { LoanList } from '../../../../components/profile/LoanList';
 import { Skeleton } from '../../../../components/Skeleton';
 import { RefreshControl } from '../../../../components/RefreshControl';
 import { useRefetchOnVisible, useRefreshing } from '../../../../lib/refresh';
-import { fetchBorrowing, fetchMyCopies, type ActiveLoan, type MyCopy } from '../../../../lib/loans';
+import { fetchBorrowing, fetchMyCopies, firstName, type ActiveLoan, type MyCopy } from '../../../../lib/loans';
 import { colors, fonts, organicCorners } from '../../../../lib/theme';
 
 interface OwnProfile {
@@ -32,7 +32,7 @@ const TABS: { key: ShelfTab; label: string }[] = [
 
 // Your own shelf says who has a copy; friends only ever see "Unavailable".
 function copyLabel(copy: MyCopy) {
-  const borrower = personName(copy.activeLoan?.borrower);
+  const borrower = firstName(copy.activeLoan?.borrower);
   if (copy.lend_status === 'promised') return `Promised to ${borrower}`;
   if (copy.lend_status === 'on_loan') return `With ${borrower}`;
   return 'Unavailable';

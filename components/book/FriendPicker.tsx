@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { fetchFriends, personName } from '../../lib/bookDetail';
-import type { Person } from '../../lib/loans';
+import { fetchFriends } from '../../lib/bookDetail';
+import { personName, type Person } from '../../lib/loans';
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
 import { Skeleton } from '../Skeleton';
