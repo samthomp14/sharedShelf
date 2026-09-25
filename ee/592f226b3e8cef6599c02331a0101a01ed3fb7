@@ -1,0 +1,30 @@
+supabase/schema.sql
+  s_e1e29242a325ce::t_14bc33e1370512 818-1426
+lib/database.types.ts
+  s_e1e29242a325ce::t_14bc33e1370512 10
+lib/loans.ts
+  s_e1e29242a325ce::t_14bc33e1370512 6
+supabase/tests/lending_v2_rollback_test.sql
+  s_e1e29242a325ce::t_14bc33e1370512 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ee592f226b3e8cef6599c02331a0101a01ed3fb7",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
