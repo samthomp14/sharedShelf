@@ -1,30 +1,26 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { supabase } from '../../../lib/supabase';
-import { loadBookAndCopies } from '../../../lib/bookDetail';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  loadBookDetail,
+  personName,
+  type BookCopy,
+  type BookInfo,
+  type BookLoan,
+  type BookRequest,
+} from '../../../lib/bookDetail';
+import { cancelRequest, lendToFriend, requestLoan, type Person } from '../../../lib/loans';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Chip } from '../../../components/Chip';
 import { Button } from '../../../components/Button';
 import { AuthorList } from '../../../components/AuthorList';
 import { Skeleton } from '../../../components/Skeleton';
 import { RefreshControl } from '../../../components/RefreshControl';
+import { ToastProvider, useToast } from '../../../components/Toast';
+import { BorrowingCard, OwnedCopyCard, type RunStep } from '../../../components/book/YourCopyCard';
+import { FriendPicker } from '../../../components/book/FriendPicker';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
-
-interface Book {
-  id: string;
-  title: string;
-  authors: string[];
-  cover_url: string | null;
-}
-
-interface CopyRow {
-  id: string;
-  status: string;
-  owner_id: string;
-  owner: { username: string; display_name: string | null } | null;
-}
 
 function CopiesSkeleton() {
   return (
@@ -38,43 +34,60 @@ function CopiesSkeleton() {
   );
 }
 
-export default function BookDetail() {
+// One page for everyone: a "Your copy" card on top for each copy you own or
+// are borrowing/picking up, then the book and every copy you can see.
+export default function BookDetailScreen() {
+  return (
+    <ToastProvider>
+      <BookDetail />
+    </ToastProvider>
+  );
+}
+
+function BookDetail() {
   const { id, title: placeholderTitle, coverUrl: placeholderCoverUrl } = useLocalSearchParams<{
     id: string;
     title?: string;
     coverUrl?: string;
   }>();
   const { session } = useAuth();
-  const ownerId = session?.user?.id ?? null;
+  const uid = session?.user?.id ?? null;
+  const toast = useToast();
   // The list you tapped from already had the title/cover — render with that
   // immediately instead of a blank screen while the full fetch is in flight.
-  const [book, setBook] = useState<Book | null>(() =>
+  const [book, setBook] = useState<BookInfo | null>(() =>
     id && placeholderTitle
       ? { id, title: placeholderTitle, authors: [], cover_url: placeholderCoverUrl || null }
       : null
   );
-  const [copies, setCopies] = useState<CopyRow[]>([]);
+  const [copies, setCopies] = useState<BookCopy[]>([]);
+  const [loans, setLoans] = useState<BookLoan[]>([]);
+  const [requests, setRequests] = useState<BookRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookLoaded, setBookLoaded] = useState(false);
   const [copiesLoaded, setCopiesLoaded] = useState(false);
-  const [requestingId, setRequestingId] = useState<string | null>(null);
-  const [returningId, setReturningId] = useState<string | null>(null);
+  // Which lending step is in flight (see RunStep); one at a time.
+  const [busy, setBusy] = useState<string | null>(null);
+  // The copy "Lend to a friend" was tapped on, while the picker is open.
+  const [lendingCopyId, setLendingCopyId] = useState<string | null>(null);
 
   const load = useCallback(async ({ fresh = false }: { fresh?: boolean } = {}) => {
     if (!id) return;
     setLoading(true);
 
-    const [bookResult, copiesResult] = await loadBookAndCopies(id, { fresh });
+    const detail = await loadBookDetail(id, { fresh });
 
-    if (!bookResult.error && bookResult.data) {
-      setBook(bookResult.data);
+    if (detail.book) {
+      setBook(detail.book);
       setBookLoaded(true);
-    } else if (bookResult.error) {
+    } else if (detail.bookError) {
       setBook(null);
       setBookLoaded(true);
     }
-    if (!copiesResult.error && copiesResult.data) {
-      setCopies(copiesResult.data as unknown as CopyRow[]);
+    if (detail.copies) {
+      setCopies(detail.copies);
+      setLoans(detail.loans);
+      setRequests(detail.requests);
     }
     setCopiesLoaded(true);
     setLoading(false);
@@ -90,40 +103,36 @@ export default function BookDetail() {
   const { refreshing, onRefresh } = useRefreshing(refetch);
   useRefetchOnVisible(refetch);
 
-  async function requestToBorrow(shelfItemId: string) {
-    if (!ownerId) return;
-    setRequestingId(shelfItemId);
-    const { error } = await supabase
-      .from('loan_requests')
-      .insert({ shelf_item_id: shelfItemId, requester_id: ownerId });
-    setRequestingId(null);
+  // The step functions refuse anything out of turn with a readable message
+  // (e.g. someone else just called it off), so show it as-is and reload
+  // either way: the page may simply have been out of date.
+  const run: RunStep = useCallback(
+    async (key, step, success) => {
+      setBusy(key);
+      try {
+        await step();
+        if (success) toast.show({ message: success });
+      } catch (e) {
+        toast.show({ message: e instanceof Error ? e.message : 'Something went wrong. Try again.' });
+      }
+      await load({ fresh: true });
+      setBusy(null);
+    },
+    [load, toast]
+  );
 
-    if (error) {
-      Alert.alert('Could not send request', error.message);
-    } else {
-      Alert.alert('Request sent', "They'll see it and can hand the book off in person.");
-      load();
-    }
+  function lendTo(friend: Person) {
+    const copyId = lendingCopyId;
+    setLendingCopyId(null);
+    if (!copyId) return;
+    run(`lend-${copyId}`, () => lendToFriend(copyId, friend.id), `Lent to ${personName(friend)}`);
   }
 
-  async function markReturned(shelfItemId: string) {
-    setReturningId(shelfItemId);
-    const { data: loan } = await supabase
-      .from('loans')
-      .select('id')
-      .eq('shelf_item_id', shelfItemId)
-      .is('returned_at', null)
-      .maybeSingle();
-
-    if (loan) {
-      await supabase
-        .from('loans')
-        .update({ returned_at: new Date().toISOString() })
-        .eq('id', loan.id);
-      load();
-    }
-    setReturningId(null);
-  }
+  const myCopies = copies.filter((c) => c.owner_id === uid);
+  const borrowing = loans.filter((l) => l.borrower_id === uid);
+  const loanFor = (copyId: string) => loans.find((l) => l.shelf_item_id === copyId) ?? null;
+  const myRequestFor = (copyId: string) =>
+    requests.find((r) => r.shelf_item_id === copyId && r.requester_id === uid) ?? null;
 
   // No placeholder to paint from (a direct/deep link, not tapped from a
   // list) — skeleton the whole layout until the first fetch lands.
@@ -155,6 +164,21 @@ export default function BookDetail() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      {myCopies.map((copy) => (
+        <OwnedCopyCard
+          key={copy.id}
+          copy={copy}
+          loan={loanFor(copy.id)}
+          requests={requests.filter((r) => r.shelf_item_id === copy.id && r.requester_id !== uid)}
+          busy={busy}
+          run={run}
+          onLendToFriend={() => setLendingCopyId(copy.id)}
+        />
+      ))}
+      {borrowing.map((loan) => (
+        <BorrowingCard key={loan.id} loan={loan} busy={busy} run={run} />
+      ))}
+
       <View style={styles.header}>
         {book.cover_url ? (
           <Image source={{ uri: book.cover_url }} style={styles.cover} resizeMode="cover" />
@@ -182,39 +206,74 @@ export default function BookDetail() {
         </Text>
       ) : (
         copies.map((copy) => {
-          const isMine = copy.owner_id === ownerId;
+          const isMine = copy.owner_id === uid;
+          const myLoan = isMine ? null : loanFor(copy.id);
+          const myRequest = isMine ? null : myRequestFor(copy.id);
+          // Friends' copies that are promised, lent or held back all read
+          // "Unavailable" — who has it is only for the two people involved.
+          const faded = !isMine && !myLoan && copy.lend_status !== 'available';
           return (
-            <View key={copy.id} style={styles.copyRow}>
+            <View key={copy.id} style={[styles.copyRow, faded && styles.copyRowFaded]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.copyOwner}>
-                  {isMine ? 'You' : copy.owner?.display_name ?? copy.owner?.username}
-                </Text>
+                <Text style={styles.copyOwner}>{isMine ? 'You' : personName(copy.owner)}</Text>
               </View>
-              {!isMine && copy.status === 'available' && (
+              {isMine ? (
+                <Chip label={ownLabel(copy.lend_status)} />
+              ) : myLoan ? (
+                <Chip label={myLoan.handed_over_at ? 'Borrowing' : 'Promised to you'} />
+              ) : copy.lend_status !== 'available' ? (
+                <Chip label="Unavailable" />
+              ) : myRequest ? (
+                <>
+                  <Chip label="Requested" />
+                  <Button
+                    title="Cancel"
+                    variant="secondary"
+                    onPress={() => run(`cancel-${myRequest.id}`, () => cancelRequest(myRequest.id), 'Request cancelled')}
+                    loading={busy === `cancel-${myRequest.id}`}
+                    disabled={busy !== null}
+                  />
+                </>
+              ) : (
                 <Button
                   title="Ask to borrow"
                   variant="secondary"
-                  onPress={() => requestToBorrow(copy.id)}
-                  loading={requestingId === copy.id}
+                  onPress={() =>
+                    run(`request-${copy.id}`, () => requestLoan(copy.id), `Asked ${personName(copy.owner)}`)
+                  }
+                  loading={busy === `request-${copy.id}`}
+                  disabled={busy !== null}
                 />
-              )}
-              {isMine && copy.status === 'on_loan' && (
-                <Button
-                  title="Mark returned"
-                  variant="secondary"
-                  onPress={() => markReturned(copy.id)}
-                  loading={returningId === copy.id}
-                />
-              )}
-              {(isMine ? copy.status !== 'on_loan' : copy.status !== 'available') && (
-                <Chip label={copy.status.replace('_', ' ')} />
               )}
             </View>
           );
         })
       )}
+
+      {uid && (
+        <FriendPicker
+          visible={lendingCopyId !== null}
+          uid={uid}
+          onPick={lendTo}
+          onClose={() => setLendingCopyId(null)}
+        />
+      )}
     </ScrollView>
   );
+}
+
+// Your own copy's state, as a short tag in the list (the card has the detail).
+function ownLabel(status: BookCopy['lend_status']): string {
+  switch (status) {
+    case 'available':
+      return 'Available';
+    case 'unavailable':
+      return 'Unavailable';
+    case 'promised':
+      return 'Promised';
+    case 'on_loan':
+      return 'Lent out';
+  }
 }
 
 const styles = StyleSheet.create({
@@ -287,6 +346,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  copyRowFaded: { opacity: 0.5 },
   copyOwner: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   emptyBody: {
     fontFamily: fonts.regular,
