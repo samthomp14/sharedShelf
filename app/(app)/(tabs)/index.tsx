@@ -1,8 +1,20 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect, type Href } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
-import { prefetchBook } from '../../../lib/bookDetail';
+import {
+  acceptRequest,
+  declineRequest,
+  fetchBorrowing,
+  fetchIncomingRequests,
+  fetchLentOut,
+  fetchLoanActivity,
+  markHandedOver,
+  markReturned,
+  type ActiveLoan,
+  type LoanFeedEvent,
+  type PendingRequest,
+} from '../../../lib/loans';
 import { profileHref } from '../../../lib/profileHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
@@ -11,25 +23,12 @@ import { InlineLink } from '../../../components/InlineLink';
 import { InstallBanner } from '../../../components/InstallBanner';
 import { RefreshControl } from '../../../components/RefreshControl';
 import { ShareAppButton } from '../../../components/ShareAppButton';
+import { ToastProvider, useToast } from '../../../components/Toast';
+import { LoanEventText } from '../../../components/activity/LoanEventText';
+import { BookLink, PersonLink, personName } from '../../../components/activity/links';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { timeAgo } from '../../../lib/time';
 import { colors, fonts, radius } from '../../../lib/theme';
-
-function bookHref(id: string, title: string, coverUrl: string | null): Href {
-  return { pathname: '/book/[id]', params: { id, title, coverUrl: coverUrl ?? '' } };
-}
-
-interface LoanRequestNeedsYou {
-  id: string;
-  created_at: string;
-  requester: {
-    id: string;
-    username: string;
-    display_name: string | null;
-    avatar_url: string | null;
-  } | null;
-  shelf_item: { book: { id: string; title: string; cover_url: string | null } | null } | null;
-}
 
 interface FriendRequestNeedsYou {
   id: string;
@@ -67,34 +66,9 @@ type FeedEvent =
   | {
       key: string;
       timestamp: string;
-      kind: 'loan_active';
-      role: 'lender' | 'borrower';
-      loanId: string;
-      counterpartId: string;
-      counterpartUsername: string;
-      counterpartName: string;
-      counterpartAvatarUrl: string | null;
-      bookId: string;
-      bookTitle: string;
-      bookCoverUrl: string | null;
-    }
-  | {
-      key: string;
-      timestamp: string;
-      kind: 'loan_returned';
-      role: 'lender' | 'borrower';
-      counterpartId: string;
-      counterpartUsername: string;
-      counterpartName: string;
-      counterpartAvatarUrl: string | null;
-      bookId: string;
-      bookTitle: string;
-      bookCoverUrl: string | null;
+      kind: 'loan';
+      loan: LoanFeedEvent;
     };
-
-function personName(p: { username: string; display_name: string | null } | null | undefined) {
-  return p?.display_name ?? p?.username ?? 'Someone';
-}
 
 function CoverThumb({ url, title }: { url: string | null; title: string }) {
   return url ? (
@@ -109,14 +83,33 @@ function CoverThumb({ url, title }: { url: string | null; title: string }) {
 }
 
 export default function Activity() {
+  return (
+    <ToastProvider>
+      <ActivityFeed />
+    </ToastProvider>
+  );
+}
+
+// Lending reads throw on failure (lib/loans logs them); an empty list keeps
+// the rest of the screen working.
+function orEmpty<T>(promise: Promise<T[]>): Promise<T[]> {
+  return promise.catch(() => []);
+}
+
+function ActivityFeed() {
   const { session } = useAuth();
+  const toast = useToast();
   const uid = session?.user?.id ?? null;
-  const [loanRequests, setLoanRequests] = useState<LoanRequestNeedsYou[]>([]);
+  const [loanRequests, setLoanRequests] = useState<PendingRequest[]>([]);
+  // Promised loans waiting on the hand-off, from each side.
+  const [toReceive, setToReceive] = useState<ActiveLoan[]>([]);
+  const [toHandOver, setToHandOver] = useState<ActiveLoan[]>([]);
+  // Your copies that are out with a friend — these get "Mark returned".
+  const [onLoanIds, setOnLoanIds] = useState<Set<string>>(new Set());
   const [friendRequests, setFriendRequests] = useState<FriendRequestNeedsYou[]>([]);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
-  const [returningId, setReturningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!uid) {
@@ -125,50 +118,41 @@ export default function Activity() {
     }
     setLoading(true);
 
-    const [loanReqRes, friendReqRes, shelfAddRes, friendshipsRes, loansRes] = await Promise.all([
-      supabase
-        .from('loan_requests')
-        .select(
-          'id, created_at, requester:profiles(id, username, display_name, avatar_url), shelf_item:shelf_items!inner(id, owner_id, book:books(id, title, cover_url))'
-        )
-        .eq('status', 'pending')
-        .eq('shelf_item.owner_id', uid),
-      supabase
-        .from('friendships')
-        .select(
-          'id, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url)'
-        )
-        .eq('status', 'pending')
-        .eq('addressee_id', uid),
-      supabase
-        .from('shelf_items')
-        .select(
-          'id, created_at, owner:profiles(id, username, display_name, avatar_url), book:books(id, title, cover_url)'
-        )
-        .neq('owner_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(30),
-      supabase
-        .from('friendships')
-        .select(
-          'id, requester_id, addressee_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name, avatar_url)'
-        )
-        .eq('status', 'accepted')
-        .order('responded_at', { ascending: false })
-        .limit(30),
-      supabase
-        .from('loans')
-        .select(
-          'id, lender_id, borrower_id, started_at, returned_at, shelf_item:shelf_items(book:books(id, title, cover_url)), lender:profiles!loans_lender_id_fkey(id, username, display_name, avatar_url), borrower:profiles!loans_borrower_id_fkey(id, username, display_name, avatar_url)'
-        )
-        .or(`lender_id.eq.${uid},borrower_id.eq.${uid}`)
-        .order('started_at', { ascending: false })
-        .limit(30),
-    ]);
+    const [friendReqRes, shelfAddRes, friendshipsRes, incoming, borrowing, lentOut, loanActivity] =
+      await Promise.all([
+        supabase
+          .from('friendships')
+          .select(
+            'id, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url)'
+          )
+          .eq('status', 'pending')
+          .eq('addressee_id', uid),
+        supabase
+          .from('shelf_items')
+          .select(
+            'id, created_at, owner:profiles(id, username, display_name, avatar_url), book:books(id, title, cover_url)'
+          )
+          .neq('owner_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('friendships')
+          .select(
+            'id, requester_id, addressee_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name, avatar_url)'
+          )
+          .eq('status', 'accepted')
+          .order('responded_at', { ascending: false })
+          .limit(30),
+        orEmpty(fetchIncomingRequests(uid)),
+        orEmpty(fetchBorrowing(uid)),
+        orEmpty(fetchLentOut(uid)),
+        orEmpty(fetchLoanActivity(uid)),
+      ]);
 
-    if (!loanReqRes.error && loanReqRes.data) {
-      setLoanRequests(loanReqRes.data as unknown as LoanRequestNeedsYou[]);
-    }
+    setLoanRequests(incoming);
+    setToReceive(borrowing.filter((loan) => !loan.handed_over_at));
+    setToHandOver(lentOut.filter((loan) => !loan.handed_over_at));
+    setOnLoanIds(new Set(lentOut.filter((loan) => loan.handed_over_at).map((loan) => loan.id)));
     if (!friendReqRes.error && friendReqRes.data) {
       setFriendRequests(friendReqRes.data as unknown as FriendRequestNeedsYou[]);
     }
@@ -210,44 +194,8 @@ export default function Activity() {
       }
     }
 
-    if (!loansRes.error && loansRes.data) {
-      for (const row of loansRes.data as any[]) {
-        const book = row.shelf_item?.book;
-        if (!book) continue;
-        const role: 'lender' | 'borrower' = row.lender_id === uid ? 'lender' : 'borrower';
-        const counterpart = role === 'lender' ? row.borrower : row.lender;
-        if (!counterpart) continue;
-        if (row.returned_at) {
-          merged.push({
-            key: `loan-${row.id}-returned`,
-            timestamp: row.returned_at,
-            kind: 'loan_returned',
-            role,
-            counterpartId: counterpart.id,
-            counterpartUsername: counterpart.username,
-            counterpartName: personName(counterpart),
-            counterpartAvatarUrl: counterpart.avatar_url,
-            bookId: book.id,
-            bookTitle: book.title,
-            bookCoverUrl: book.cover_url,
-          });
-        } else {
-          merged.push({
-            key: `loan-${row.id}-active`,
-            timestamp: row.started_at,
-            kind: 'loan_active',
-            role,
-            loanId: row.id,
-            counterpartId: counterpart.id,
-            counterpartUsername: counterpart.username,
-            counterpartName: personName(counterpart),
-            counterpartAvatarUrl: counterpart.avatar_url,
-            bookId: book.id,
-            bookTitle: book.title,
-            bookCoverUrl: book.cover_url,
-          });
-        }
-      }
+    for (const loan of loanActivity) {
+      merged.push({ key: loan.key, timestamp: loan.timestamp, kind: 'loan', loan });
     }
 
     merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -263,14 +211,17 @@ export default function Activity() {
   const { refreshing, onRefresh } = useRefreshing(load);
   useRefetchOnVisible(load);
 
-  async function respondLoanRequest(requestId: string, status: 'accepted' | 'declined') {
-    setActingId(requestId);
-    const { error } = await supabase
-      .from('loan_requests')
-      .update({ status, responded_at: new Date().toISOString() })
-      .eq('id', requestId);
+  // Runs one lending step, shows its refusal (if any) as a toast, then
+  // reloads — the state may have moved on either way.
+  async function runLoanStep(id: string, run: () => Promise<unknown>) {
+    setActingId(id);
+    try {
+      await run();
+    } catch (e) {
+      toast.show({ message: e instanceof Error ? e.message : 'Something went wrong' });
+    }
     setActingId(null);
-    if (!error) load();
+    load();
   }
 
   async function respondFriendRequest(requestId: string, action: 'accept' | 'decline') {
@@ -287,17 +238,11 @@ export default function Activity() {
     load();
   }
 
-  async function markReturned(loanId: string) {
-    setReturningId(loanId);
-    await supabase
-      .from('loans')
-      .update({ returned_at: new Date().toISOString() })
-      .eq('id', loanId);
-    setReturningId(null);
-    load();
-  }
-
-  const hasNeedsYou = loanRequests.length > 0 || friendRequests.length > 0;
+  const hasNeedsYou =
+    loanRequests.length > 0 ||
+    toReceive.length > 0 ||
+    toHandOver.length > 0 ||
+    friendRequests.length > 0;
 
   return (
     <ScrollView
@@ -309,54 +254,75 @@ export default function Activity() {
       {hasNeedsYou && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Needs you</Text>
-          {loanRequests.map((req) => {
-            const book = req.shelf_item?.book;
-            return (
-              <View key={req.id} style={styles.row}>
-                <Avatar
-                  avatarUrl={req.requester?.avatar_url}
-                  label={personName(req.requester)}
-                  size={40}
-                />
-                <View style={styles.rowMiddle}>
-                  <Text style={styles.eventText}>
-                    <InlineLink
-                      href={profileHref(req.requester?.username ?? '', req.requester?.display_name, req.requester?.avatar_url)}
-                    >
-                      {personName(req.requester)}
-                    </InlineLink>{' '}
-                    wants to borrow "
-                    {book ? (
-                      <InlineLink
-                        href={bookHref(book.id, book.title, book.cover_url)}
-                        onPressIn={() => prefetchBook(book.id)}
-                      >
-                        {book.title}
-                      </InlineLink>
-                    ) : (
-                      'a book'
-                    )}
-                    "
-                  </Text>
-                  <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
-                  <View style={styles.needsYouActions}>
-                    <Button
-                      title="Decline"
-                      variant="secondary"
-                      onPress={() => respondLoanRequest(req.id, 'declined')}
-                      loading={actingId === req.id}
-                    />
-                    <Button
-                      title="Accept"
-                      onPress={() => respondLoanRequest(req.id, 'accepted')}
-                      loading={actingId === req.id}
-                    />
-                  </View>
+          {loanRequests.map((req) => (
+            <View key={req.id} style={styles.row}>
+              <Avatar
+                avatarUrl={req.requester?.avatar_url}
+                label={personName(req.requester)}
+                size={40}
+              />
+              <View style={styles.rowMiddle}>
+                <Text style={styles.eventText}>
+                  {req.requester ? <PersonLink person={req.requester} /> : 'Someone'} wants to borrow{' '}
+                  {req.book ? <BookLink book={req.book} /> : 'a book'}
+                </Text>
+                <Text style={styles.timestamp}>{timeAgo(req.created_at)}</Text>
+                <View style={styles.needsYouActions}>
+                  <Button
+                    title="Decline"
+                    variant="secondary"
+                    onPress={() => runLoanStep(req.id, () => declineRequest(req.id))}
+                    loading={actingId === req.id}
+                  />
+                  <Button
+                    title="Accept"
+                    onPress={() => runLoanStep(req.id, () => acceptRequest(req.id))}
+                    loading={actingId === req.id}
+                  />
                 </View>
-                {book && <CoverThumb url={book.cover_url} title={book.title} />}
               </View>
-            );
-          })}
+              {req.book && <CoverThumb url={req.book.cover_url} title={req.book.title} />}
+            </View>
+          ))}
+          {toReceive.map((loan) => (
+            <View key={loan.id} style={styles.row}>
+              <Avatar avatarUrl={loan.owner?.avatar_url} label={personName(loan.owner)} size={40} />
+              <View style={styles.rowMiddle}>
+                <Text style={styles.eventText}>
+                  Did you get {loan.book ? <BookLink book={loan.book} /> : 'the book'} from{' '}
+                  {loan.owner ? <PersonLink person={loan.owner} /> : 'them'}?
+                </Text>
+                <Text style={styles.timestamp}>Promised {timeAgo(loan.created_at)}</Text>
+                <Button
+                  title="Got it"
+                  onPress={() => runLoanStep(loan.id, () => markHandedOver(loan.id))}
+                  loading={actingId === loan.id}
+                  style={styles.singleAction}
+                />
+              </View>
+              {loan.book && <CoverThumb url={loan.book.cover_url} title={loan.book.title} />}
+            </View>
+          ))}
+          {toHandOver.map((loan) => (
+            <View key={loan.id} style={styles.row}>
+              <Avatar avatarUrl={loan.borrower?.avatar_url} label={personName(loan.borrower)} size={40} />
+              <View style={styles.rowMiddle}>
+                <Text style={styles.eventText}>
+                  You promised {loan.book ? <BookLink book={loan.book} /> : 'a book'} to{' '}
+                  {loan.borrower ? <PersonLink person={loan.borrower} /> : 'someone'}
+                </Text>
+                <Text style={styles.timestamp}>{timeAgo(loan.created_at)}</Text>
+                <Button
+                  title="Mark handed over"
+                  variant="secondary"
+                  onPress={() => runLoanStep(loan.id, () => markHandedOver(loan.id))}
+                  loading={actingId === loan.id}
+                  style={styles.singleAction}
+                />
+              </View>
+              {loan.book && <CoverThumb url={loan.book.cover_url} title={loan.book.title} />}
+            </View>
+          ))}
           {friendRequests.map((req) => (
             <View key={req.id} style={styles.row}>
               <Avatar
@@ -410,13 +376,21 @@ export default function Activity() {
                 ? event.actorAvatarUrl
                 : event.kind === 'new_friend'
                   ? event.friendAvatarUrl
-                  : event.counterpartAvatarUrl;
+                  : event.loan.counterpart.avatar_url;
             const avatarLabel =
               event.kind === 'shelf_add'
                 ? event.actorName
                 : event.kind === 'new_friend'
                   ? event.friendName
-                  : event.counterpartName;
+                  : personName(event.loan.counterpart);
+            // The hand-off line of a copy that's still out gets "Mark returned".
+            const returnableLoanId =
+              event.kind === 'loan' &&
+              event.loan.kind === 'handed_over' &&
+              event.loan.loanId &&
+              onLoanIds.has(event.loan.loanId)
+                ? event.loan.loanId
+                : null;
 
             return (
               <View key={event.key} style={styles.row}>
@@ -428,14 +402,9 @@ export default function Activity() {
                           <InlineLink href={profileHref(event.actorUsername, event.actorName, event.actorAvatarUrl)}>
                             {event.actorName}
                           </InlineLink>{' '}
-                          added "
-                          <InlineLink
-                            href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
-                            onPressIn={() => prefetchBook(event.bookId)}
-                          >
-                            {event.bookTitle}
-                          </InlineLink>
-                          " to their shelf
+                          added{' '}
+                          <BookLink book={{ id: event.bookId, title: event.bookTitle, cover_url: event.bookCoverUrl }} />{' '}
+                          to their shelf
                         </>
                       )}
                       {event.kind === 'new_friend' && (
@@ -447,91 +416,21 @@ export default function Activity() {
                           are now friends
                         </>
                       )}
-                      {event.kind === 'loan_active' &&
-                        (event.role === 'lender' ? (
-                          <>
-                            You lent "
-                            <InlineLink
-                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
-                              onPressIn={() => prefetchBook(event.bookId)}
-                            >
-                              {event.bookTitle}
-                            </InlineLink>
-                            " to{' '}
-                            <InlineLink
-                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
-                            >
-                              {event.counterpartName}
-                            </InlineLink>
-                          </>
-                        ) : (
-                          <>
-                            <InlineLink
-                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
-                            >
-                              {event.counterpartName}
-                            </InlineLink>{' '}
-                            lent you "
-                            <InlineLink
-                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
-                              onPressIn={() => prefetchBook(event.bookId)}
-                            >
-                              {event.bookTitle}
-                            </InlineLink>
-                            "
-                          </>
-                        ))}
-                      {event.kind === 'loan_returned' &&
-                        (event.role === 'lender' ? (
-                          <>
-                            <InlineLink
-                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
-                            >
-                              {event.counterpartName}
-                            </InlineLink>{' '}
-                            returned "
-                            <InlineLink
-                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
-                              onPressIn={() => prefetchBook(event.bookId)}
-                            >
-                              {event.bookTitle}
-                            </InlineLink>
-                            "
-                          </>
-                        ) : (
-                          <>
-                            You returned "
-                            <InlineLink
-                              href={bookHref(event.bookId, event.bookTitle, event.bookCoverUrl)}
-                              onPressIn={() => prefetchBook(event.bookId)}
-                            >
-                              {event.bookTitle}
-                            </InlineLink>
-                            " to{' '}
-                            <InlineLink
-                              href={profileHref(event.counterpartUsername, event.counterpartName, event.counterpartAvatarUrl)}
-                            >
-                              {event.counterpartName}
-                            </InlineLink>
-                          </>
-                        ))}
+                      {event.kind === 'loan' && <LoanEventText event={event.loan} />}
                   </Text>
                   <Text style={styles.timestamp}>{timeAgo(event.timestamp)}</Text>
-                  {event.kind === 'loan_active' && event.role === 'lender' && (
+                  {returnableLoanId && (
                     <Button
                       title="Mark returned"
                       variant="secondary"
-                      onPress={() => markReturned(event.loanId)}
-                      loading={returningId === event.loanId}
-                      style={styles.markReturnedButton}
+                      onPress={() => runLoanStep(returnableLoanId, () => markReturned(returnableLoanId))}
+                      loading={actingId === returnableLoanId}
+                      style={styles.singleAction}
                     />
                   )}
                 </View>
-                {(event.kind === 'shelf_add' ||
-                  event.kind === 'loan_active' ||
-                  event.kind === 'loan_returned') && (
-                  <CoverThumb url={event.bookCoverUrl} title={event.bookTitle} />
-                )}
+                {event.kind === 'shelf_add' && <CoverThumb url={event.bookCoverUrl} title={event.bookTitle} />}
+                {event.kind === 'loan' && <CoverThumb url={event.loan.book.cover_url} title={event.loan.book.title} />}
               </View>
             );
           })
@@ -575,7 +474,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  markReturnedButton: {
+  singleAction: {
     alignSelf: 'flex-start',
     marginTop: 8,
   },
