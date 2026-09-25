@@ -1,0 +1,34 @@
+app/(app)/(tabs)/profile/index.tsx
+  s_db43040a74caf6::t_09018f0b2dfb63 9-12,16-27,40,42-46,50-57,59,66-67,79,84,95,107-119,156-157,202-212,216,221,223-225,230,232-235
+components/profile/MiniAvatar.tsx
+  s_db43040a74caf6::t_36606264f05e03 1-48
+components/ShelfGrid.tsx
+  s_db43040a74caf6::t_1c14a04273de8f 3,7-19,21,24,41-98,114,138-200
+  s_db43040a74caf6::t_e3145b0400d113 201
+lib/loans.ts
+  s_db43040a74caf6::t_b5cb1245b14923 246-267
+lib/time.ts
+  s_db43040a74caf6::t_b5cb1245b14923 17-61
+components/profile/LoanList.tsx
+  s_db43040a74caf6::t_c7ad54f8f0ad9c 1,4-5,7-8,11-26,29-35,37-95,98,100-103,107-109,111,116-226,229-248,253-261,267-272,276,293,298,307-315,317-323,325-327
+components/profile/ProfileTabs.tsx
+  s_db43040a74caf6::t_36606264f05e03 1-93
+app/(app)/profile/[username].tsx
+  s_db43040a74caf6::t_4715002d103420 239-247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6e41dd83b86a9ecab73abf98fcc7844576282e5e",
+  "prompts": {},
+  "sessions": {
+    "s_db43040a74caf6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ebd1f803-4b5c-49c1-9101-0cb51b01ae90",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
