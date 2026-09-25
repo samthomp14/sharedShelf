@@ -1,0 +1,42 @@
+components/profile/LoanList.tsx
+  s_e1e29242a325ce::t_6b139dda28c957 4
+app/(app)/book/[id].tsx
+  s_e1e29242a325ce::t_1a99134418d16e 11
+lib/bookDetail.ts
+  s_e1e29242a325ce::t_1a99134418d16e 4
+components/activity/links.tsx
+  s_e1e29242a325ce::t_6b139dda28c957 4
+components/book/FriendPicker.tsx
+  s_e1e29242a325ce::t_1a99134418d16e 3-4
+components/book/YourCopyCard.tsx
+  s_e1e29242a325ce::t_1a99134418d16e 12
+  s_e1e29242a325ce::t_b4131c79a1f185 9
+lib/loans.ts
+  s_e1e29242a325ce::t_a7da420b9e5ad6 22-32
+app/(app)/(tabs)/index.tsx
+  s_e1e29242a325ce::t_1a99134418d16e 29
+  s_e1e29242a325ce::t_f0420508938587 14
+app/(app)/(tabs)/profile/index.tsx
+  s_e1e29242a325ce::t_1a99134418d16e 11,15,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "96ca8cdb6511b9b8e1c1672c26ca18dc56ff3b5d",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
