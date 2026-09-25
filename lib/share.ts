@@ -3,7 +3,14 @@
 
 import { Platform, Share } from 'react-native';
 
-export const APP_URL = 'https://shared-shelf-henna.vercel.app/';
+const PRODUCTION_URL = 'https://shared-shelf-henna.vercel.app/';
+
+// On web, links point back at whichever site is running (production, staging,
+// a preview), so invites made on staging stay on staging. Native has no origin.
+export const APP_URL =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+    ? `${window.location.origin}/`
+    : PRODUCTION_URL;
 const TITLE = 'sharedShelf';
 const TEXT = "Your friends' shelves, one tap away.";
 
