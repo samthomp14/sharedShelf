@@ -1,0 +1,29 @@
+components/activity/LoanEventText.tsx
+  s_e1e29242a325ce::t_f7c660639b94cd 1-18,20-46,48-52
+  s_e1e29242a325ce::t_d211dc3917c419 19,47
+components/activity/links.tsx
+  s_e1e29242a325ce::t_5f67f6ca3285e1 1-36
+app/(app)/(tabs)/index.tsx
+  s_e1e29242a325ce::t_85b87df3ef22b7 2,5-17,26-28,69-70,86-99,101,103-108,121-150,152-155,197-198,214-222,224,241-245,257-281,284-325,379,385-393,405-407,419,422,426-428,432-433,477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "21be186952dadaf49a0d4665738a091f8855a900",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_e1e29242a325ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "352362fc-6be2-473a-8105-15058fdf1942",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
