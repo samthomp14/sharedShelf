@@ -16,13 +16,12 @@ export default function TabsLayout() {
         // `height` includes the status-bar inset the header pads itself with.
         headerStyle: { backgroundColor: colors.background, height: insets.top + headerHeight },
         headerShadowVisible: false,
-        // On every tab, so what needs you is one tap away wherever you are.
-        headerRight: () => <NotificationsBell />,
         headerTitleStyle: { fontFamily: fonts.displayItalic, color: colors.text, fontSize: 19 },
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Activity' }} />
+      {/* The bell lives on Activity only: that's where notifications belong. */}
+      <Tabs.Screen name="index" options={{ title: 'Activity', headerRight: () => <NotificationsBell /> }} />
       <Tabs.Screen name="add-book" options={{ title: 'Add Book' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

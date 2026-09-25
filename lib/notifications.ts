@@ -18,6 +18,11 @@ import {
 // The Notifications screen (behind the header bell): "Needs you" — things
 // waiting on you — and "Earlier", the finished loan steps you were part of.
 
+// A line in "Earlier": a finished loan step, or someone you became friends with.
+export type EarlierItem =
+  | { kind: 'loan'; key: string; timestamp: string; event: LoanFeedEvent }
+  | { kind: 'new_friend'; key: string; timestamp: string; friend: Person };
+
 export type NeedsYouItem =
   | { kind: 'borrow_request'; key: string; timestamp: string; request: PendingRequest }
   | { kind: 'hand_over'; key: string; timestamp: string; loan: ActiveLoan } // you promised it
@@ -44,6 +49,29 @@ async function fetchFriendRequests(uid: string): Promise<{ id: string; created_a
     return [];
   }
   return (data ?? []) as unknown as { id: string; created_at: string; requester: Person | null }[];
+}
+
+// Friendships you're in, newest first, as "You and X are now friends".
+async function fetchNewFriends(uid: string, limit = 30): Promise<EarlierItem[]> {
+  const { data, error } = await supabase
+    .from('friendships')
+    .select(
+      'id, requester_id, responded_at, created_at, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name, avatar_url)'
+    )
+    .eq('status', 'accepted')
+    .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`)
+    .order('responded_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    log.error('notifications.new_friends_failed', { error: error.message });
+    return [];
+  }
+  return ((data ?? []) as any[]).flatMap((row): EarlierItem[] => {
+    const friend = (row.requester_id === uid ? row.addressee : row.requester) as Person | null;
+    return friend
+      ? [{ kind: 'new_friend', key: `friend-${row.id}`, timestamp: row.responded_at ?? row.created_at, friend }]
+      : [];
+  });
 }
 
 // Everything waiting on you, grouped by kind (borrow requests first, then
@@ -85,13 +113,17 @@ export async function fetchNeedsYou(uid: string): Promise<NeedsYouItem[]> {
   ];
 }
 
-// Needs you plus the loan history, minus the history lines for anything
-// still in Needs you (a pending request's "asked to borrow", a promised
-// loan's "promised") so nothing shows twice.
+// Needs you, plus "Earlier": the loan history and new friendships, minus the
+// history lines for anything still in Needs you (a pending request's "asked
+// to borrow", a promised loan's "promised") so nothing shows twice.
 export async function fetchNotifications(
   uid: string
-): Promise<{ needsYou: NeedsYouItem[]; earlier: LoanFeedEvent[] }> {
-  const [needsYou, activity] = await Promise.all([fetchNeedsYou(uid), orEmpty(fetchLoanActivity(uid))]);
+): Promise<{ needsYou: NeedsYouItem[]; earlier: EarlierItem[] }> {
+  const [needsYou, activity, newFriends] = await Promise.all([
+    fetchNeedsYou(uid),
+    orEmpty(fetchLoanActivity(uid)),
+    fetchNewFriends(uid),
+  ]);
 
   const pendingRequestIds = new Set<string>();
   const promisedLoanIds = new Set<string>();
@@ -100,11 +132,17 @@ export async function fetchNotifications(
     if (item.kind === 'hand_over' || item.kind === 'pick_up') promisedLoanIds.add(item.loan.id);
   }
 
-  const earlier = activity.filter((event) => {
-    if (event.kind === 'requested' && event.requestId && pendingRequestIds.has(event.requestId)) return false;
-    if (event.kind === 'promised' && event.loanId && promisedLoanIds.has(event.loanId)) return false;
-    return true;
-  });
+  const loanLines = activity
+    .filter((event) => {
+      if (event.kind === 'requested' && event.requestId && pendingRequestIds.has(event.requestId)) return false;
+      if (event.kind === 'promised' && event.loanId && promisedLoanIds.has(event.loanId)) return false;
+      return true;
+    })
+    .map((event): EarlierItem => ({ kind: 'loan', key: event.key, timestamp: event.timestamp, event }));
+
+  const earlier = [...loanLines, ...newFriends]
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, 40);
   return { needsYou, earlier };
 }
 

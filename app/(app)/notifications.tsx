@@ -10,9 +10,8 @@ import {
   markHandedOver,
   personName,
   type BookRef,
-  type LoanFeedEvent,
 } from '../../lib/loans';
-import { fetchNotifications, type NeedsYouItem } from '../../lib/notifications';
+import { fetchNotifications, type EarlierItem, type NeedsYouItem } from '../../lib/notifications';
 import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
@@ -38,7 +37,7 @@ function NotificationsList() {
   const toast = useToast();
   const uid = session?.user?.id ?? null;
   const [needsYou, setNeedsYou] = useState<NeedsYouItem[]>([]);
-  const [earlier, setEarlier] = useState<LoanFeedEvent[]>([]);
+  const [earlier, setEarlier] = useState<EarlierItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
 
@@ -215,22 +214,27 @@ function NotificationsList() {
       {earlier.length > 0 && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, styles.sectionHeader]}>Earlier</Text>
-          {earlier.map((event, i) => (
-            <View key={event.key} style={[styles.row, i === earlier.length - 1 && styles.lastRow]}>
-              <Avatar
-                avatarUrl={event.counterpart.avatar_url}
-                label={personName(event.counterpart)}
-                size={40}
-              />
-              <View style={styles.rowMiddle}>
-                <Text style={styles.eventText}>
-                  <LoanEventText event={event} />
-                </Text>
-                <Text style={styles.timestamp}>{timeAgo(event.timestamp)}</Text>
+          {earlier.map((item, i) => {
+            const person = item.kind === 'loan' ? item.event.counterpart : item.friend;
+            return (
+              <View key={item.key} style={[styles.row, i === earlier.length - 1 && styles.lastRow]}>
+                <Avatar avatarUrl={person.avatar_url} label={personName(person)} size={40} />
+                <View style={styles.rowMiddle}>
+                  <Text style={styles.eventText}>
+                    {item.kind === 'loan' ? (
+                      <LoanEventText event={item.event} />
+                    ) : (
+                      <>
+                        You and <PersonLink person={item.friend} /> are now friends
+                      </>
+                    )}
+                  </Text>
+                  <Text style={styles.timestamp}>{timeAgo(item.timestamp)}</Text>
+                </View>
+                {item.kind === 'loan' && <CoverThumb book={item.event.book} linked />}
               </View>
-              <CoverThumb book={event.book} linked />
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </ScrollView>
