@@ -237,6 +237,28 @@ $$;
 
 revoke execute on function public.friend_count(uuid) from public, anon;
 
+-- Unfriending (deleting an accepted row) cancels pending borrow requests
+-- between the two. Promised and handed-over loans stay so the book can
+-- still come back. Cancelled requests send no push.
+create function public.handle_unfriend()
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if old.status = 'accepted' then
+    update public.loan_requests_v2
+    set status = 'cancelled', responded_at = now()
+    where status = 'pending'
+      and ((owner_id = old.requester_id and requester_id = old.addressee_id)
+        or (owner_id = old.addressee_id and requester_id = old.requester_id));
+  end if;
+  return old;
+end;
+$$;
+
+revoke execute on function public.handle_unfriend() from public, anon, authenticated;
+
 -- ============================================================
 -- invites: expiring invite codes (/invite/<code>). Using one makes
 -- you and the inviter friends straight away — no request to accept —
@@ -709,6 +731,11 @@ create policy "owner or requester can see a v2 loan request"
   on public.loan_requests_v2 for select
   to authenticated
   using ((select auth.uid()) = owner_id or (select auth.uid()) = requester_id);
+
+-- Declared up with friendships; attached here once loan_requests_v2 exists.
+create trigger on_unfriend
+  after delete on public.friendships
+  for each row execute procedure public.handle_unfriend();
 
 -- ------------------------------------------------------------
 -- loans_v2: created at accept (promised) or lend_to_friend (handed over).

@@ -47,6 +47,7 @@ export default function UserProfile() {
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
   const [status, setStatus] = useState<FriendStatus | null>(null);
   const [acting, setActing] = useState(false);
+  const [confirmingUnfriend, setConfirmingUnfriend] = useState(false);
 
   const load = useCallback(async () => {
     if (!username) return;
@@ -147,6 +148,19 @@ export default function UserProfile() {
     load();
   }
 
+  async function unfriend() {
+    if (!friendshipId) return;
+    setActing(true);
+    const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
+    setActing(false);
+    if (error) {
+      Alert.alert('Could not unfriend', error.message);
+      return;
+    }
+    setConfirmingUnfriend(false);
+    load();
+  }
+
   if (notFound) {
     return (
       <View style={styles.container}>
@@ -235,6 +249,33 @@ export default function UserProfile() {
       )}
 
       {detailsLoaded && isFriends && (
+        <View style={styles.actions}>
+          {confirmingUnfriend ? (
+            <View style={styles.confirm}>
+              <Text style={styles.confirmText}>
+                Unfriend @{username}? You'll stop seeing each other's shelves, and any open borrow
+                requests between you are cancelled. Books already lent stay tracked until they're back.
+              </Text>
+              <Button title="Unfriend" onPress={unfriend} loading={acting} />
+              <Button
+                title="Cancel"
+                variant="ghost"
+                onPress={() => setConfirmingUnfriend(false)}
+                disabled={acting}
+              />
+            </View>
+          ) : (
+            <Button
+              title="Friends ✓"
+              variant="secondary"
+              size="compact"
+              onPress={() => setConfirmingUnfriend(true)}
+            />
+          )}
+        </View>
+      )}
+
+      {detailsLoaded && isFriends && (
         <View style={styles.grid}>
           <ShelfGrid
             items={(items ?? []).map((item) => ({
@@ -308,6 +349,19 @@ const styles = StyleSheet.create({
   },
   grid: {
     marginTop: 20,
+  },
+  confirm: {
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
   },
   hint: {
     fontFamily: fonts.regular,
