@@ -18,6 +18,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { ResetPassword } from '../components/ResetPassword';
 import { colors } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -37,7 +38,7 @@ const navigationTheme = {
 };
 
 function RootNavigator() {
-  const { session, initializing } = useAuth();
+  const { session, initializing, recovering } = useAuth();
 
   if (initializing) {
     return (
@@ -45,6 +46,11 @@ function RootNavigator() {
         <ActivityIndicator color={colors.text} />
       </View>
     );
+  }
+
+  // Opened a password-reset link: set a new password before anything else.
+  if (session && recovering) {
+    return <ResetPassword />;
   }
 
   return (

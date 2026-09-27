@@ -10,6 +10,7 @@ import {
   markReturned,
   personName,
   setCopyAvailable,
+  setCopyVisible,
   type Person,
 } from '../../lib/loans';
 import type { BookCopy, BookLoan, BookRequest } from '../../lib/bookDetail';
@@ -106,6 +107,35 @@ function CloseGlyph() {
   );
 }
 
+// Show or hide the copy from friends. Sits at the bottom of every owned-copy
+// card, since a copy can be hidden whatever its lending state.
+function VisibilityRow({ copy, busy, run }: { copy: BookCopy; busy: string | null; run: RunStep }) {
+  const visible = copy.visibility === 'friends';
+  const key = `visible-${copy.id}`;
+  return (
+    <View style={[styles.divided, styles.switchRow]}>
+      <View style={styles.flex}>
+        <Text style={styles.rowTitle}>{visible ? 'On your shelf for friends' : 'Hidden from friends'}</Text>
+        <Text style={styles.note}>{visible ? 'Friends can see this copy' : 'Only you can see this copy'}</Text>
+      </View>
+      {busy === key ? (
+        <ActivityIndicator color={colors.text} />
+      ) : (
+        <Switch
+          value={visible}
+          onValueChange={(next) =>
+            run(key, () => setCopyVisible(copy.id, next), next ? 'Visible to friends' : 'Hidden from friends')
+          }
+          disabled={busy !== null}
+          trackColor={{ false: colors.chipBackground, true: colors.text }}
+          thumbColor={colors.background}
+          accessibilityLabel="Visible to friends"
+        />
+      )}
+    </View>
+  );
+}
+
 interface OwnedCopyCardProps {
   copy: BookCopy;
   loan: BookLoan | null;
@@ -142,6 +172,7 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
             disabled={disabled}
           />
         </View>
+        <VisibilityRow copy={copy} busy={busy} run={run} />
       </Card>
     );
   }
@@ -162,6 +193,7 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
           loading={busy === `return-${loan.id}`}
           disabled={disabled}
         />
+        <VisibilityRow copy={copy} busy={busy} run={run} />
       </Card>
     );
   }
@@ -171,13 +203,20 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
   const available = copy.lend_status === 'available';
   const locked = copy.lend_status === 'promised' || copy.lend_status === 'on_loan';
   const switchKey = `available-${copy.id}`;
+  const hidden = copy.visibility === 'private';
   return (
     <Card label="Your copy">
       <View style={styles.switchRow}>
         <View style={styles.flex}>
           <Text style={styles.heading}>{available ? 'Available to borrow' : 'Not lending'}</Text>
           <Text style={styles.note}>
-            {available ? 'Friends can ask for it' : "Friends can't ask to borrow it"}
+            {hidden
+              ? available
+                ? 'Hidden, so only you can lend it directly'
+                : 'Hidden, and not lending'
+              : available
+                ? 'Friends can ask for it'
+                : "Friends can't ask to borrow it"}
           </Text>
         </View>
         {busy === switchKey ? (
@@ -251,6 +290,8 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
           </Pressable>
         </View>
       )}
+
+      <VisibilityRow copy={copy} busy={busy} run={run} />
     </Card>
   );
 }
@@ -363,6 +404,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   personHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   heading: { fontFamily: fonts.displaySemibold, fontSize: 18, color: colors.text },
+  rowTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   note: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, marginTop: 2 },
   noteAccent: { fontFamily: fonts.semibold, color: colors.accent },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

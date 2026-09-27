@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { log } from '../../../lib/log';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
 import { NotificationSettings } from '../../../components/NotificationSettings';
@@ -32,6 +33,13 @@ export default function ProfileSettings() {
   // Once the user starts editing, stop letting the background refresh
   // overwrite what they've typed.
   const [dirty, setDirty] = useState(false);
+  // Delete account: a second step where you type your username to confirm.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // The saved username, which is what you type to confirm (not the field above).
+  const [savedUsername, setSavedUsername] = useState(params.username ?? '');
 
   useEffect(() => {
     load();
@@ -47,6 +55,7 @@ export default function ProfileSettings() {
       .eq('id', uid)
       .single();
 
+    if (data) setSavedUsername(data.username);
     if (data && !dirty) {
       setUsername(data.username);
       setDisplayName(data.display_name ?? '');
@@ -79,6 +88,21 @@ export default function ProfileSettings() {
     }
 
     setSaved(true);
+    setSavedUsername(username);
+  }
+
+  async function deleteAccount() {
+    setDeleteError(null);
+    setDeleting(true);
+    const { error: deleteFailed } = await supabase.rpc('delete_account');
+    if (deleteFailed) {
+      log.error('account.delete_failed', { error: deleteFailed.message });
+      setDeleting(false);
+      setDeleteError(deleteFailed.message);
+      return;
+    }
+    // The account is gone, so there's no server session left to end.
+    await supabase.auth.signOut({ scope: 'local' });
   }
 
   async function signOut() {
@@ -142,6 +166,47 @@ export default function ProfileSettings() {
 
       <View style={styles.signOutSection}>
         <Button title="Sign out" variant="secondary" onPress={signOut} />
+
+        {confirmingDelete ? (
+          <View style={styles.deleteBox}>
+            <Text style={styles.deleteTitle}>Delete your account?</Text>
+            <Text style={styles.deleteBody}>
+              This removes your profile, your shelf, your friends and your lending history, and
+              can't be undone. Books you're borrowing drop off your friends' records, so give them
+              back first.
+            </Text>
+            <Text style={styles.label}>Type {savedUsername} to confirm</Text>
+            <TextInput
+              style={inputStyle}
+              value={deleteText}
+              onChangeText={setDeleteText}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={savedUsername}
+              placeholderTextColor={colors.textFaint}
+            />
+            {deleteError && <Text style={styles.errorText}>{deleteError}</Text>}
+            <Button
+              title="Delete my account"
+              onPress={deleteAccount}
+              loading={deleting}
+              disabled={!savedUsername || deleteText.trim() !== savedUsername}
+              style={[styles.deleteButton, deleteText.trim() !== savedUsername && styles.dimmed]}
+            />
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={() => {
+                setConfirmingDelete(false);
+                setDeleteText('');
+                setDeleteError(null);
+              }}
+              disabled={deleting}
+            />
+          </View>
+        ) : (
+          <Button title="Delete account" variant="ghost" onPress={() => setConfirmingDelete(true)} />
+        )}
       </View>
     </ScrollView>
   );
@@ -190,7 +255,34 @@ const styles = StyleSheet.create({
   submit: {
     marginTop: 20,
   },
+  deleteBox: {
+    marginTop: 8,
+    padding: 14,
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  deleteTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    color: colors.danger,
+  },
+  deleteBody: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+  },
+  deleteButton: {
+    marginTop: 4,
+    backgroundColor: colors.danger,
+  },
+  dimmed: {
+    opacity: 0.5,
+  },
   signOutSection: {
+    gap: 8,
     marginTop: 24,
     paddingTop: 16,
     borderTopWidth: 1,

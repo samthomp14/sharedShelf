@@ -105,6 +105,14 @@ export interface Database {
         Args: { p_shelf_item_id: string; p_available: boolean };
         Returns: undefined;
       };
+      set_copy_visibility: {
+        Args: { p_shelf_item_id: string; p_visible: boolean };
+        Returns: undefined;
+      };
+      delete_account: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
     };
     Tables: {
       profiles: {

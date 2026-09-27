@@ -17,6 +17,7 @@ export interface BookCopy {
   id: string;
   owner_id: string;
   lend_status: CopyLendStatus;
+  visibility: 'friends' | 'private'; // friends only ever get 'friends' copies (RLS)
   created_at: string; // when it went on the owner's shelf
   owner: Person | null;
 }
@@ -62,7 +63,7 @@ async function fetchBookDetail(id: string): Promise<BookDetail> {
     supabase.from('books').select('id, title, authors, cover_url').eq('id', id).single(),
     supabase
       .from('shelf_items')
-      .select(`id, owner_id, lend_status, created_at, owner:profiles(${PERSON})`)
+      .select(`id, owner_id, lend_status, visibility, created_at, owner:profiles(${PERSON})`)
       .eq('book_id', id),
     supabase
       .from('loans_v2')

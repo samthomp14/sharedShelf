@@ -157,6 +157,14 @@ export async function setCopyAvailable(shelfItemId: string, available: boolean):
   );
 }
 
+// Owner: show a copy to friends or hide it (any time, even while lent).
+// Hiding declines pending requests.
+export async function setCopyVisible(shelfItemId: string, visible: boolean): Promise<void> {
+  await step('set_visibility', { shelfItemId, visible }, () =>
+    supabase.rpc('set_copy_visibility', { p_shelf_item_id: shelfItemId, p_visible: visible })
+  );
+}
+
 // Removing a copy is the existing removeFromShelf (lib/bookLookup.ts); a
 // trigger closes its active loan with ended_reason 'removed'.
 

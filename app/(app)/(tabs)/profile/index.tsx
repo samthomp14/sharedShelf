@@ -42,6 +42,7 @@ function copyBadge(copy: MyCopy): ShelfGridBadge | null {
   const initial = borrower.charAt(0).toUpperCase();
   if (copy.lend_status === 'promised') return { kind: 'promised', label: `For ${borrower}`, initial };
   if (copy.lend_status === 'on_loan') return { kind: 'out', label: `With ${borrower}`, initial };
+  if (copy.visibility === 'private') return { kind: 'off', label: 'Hidden' };
   if (copy.lend_status === 'unavailable') return { kind: 'off', label: 'Not lending' };
   return null;
 }

@@ -232,7 +232,14 @@ export default function UserProfile() {
       {detailsLoaded && !isFriends && (
         <View style={styles.actions}>
           {status === 'none' && <Button title="Add friend" onPress={sendRequest} loading={acting} />}
-          {status === 'pending_sent' && <Button title="Request sent" variant="secondary" disabled />}
+          {status === 'pending_sent' && (
+            <Button
+              title="Cancel request"
+              variant="secondary"
+              onPress={() => respond('declined')}
+              loading={acting}
+            />
+          )}
           {status === 'pending_received' && (
             <>
               <Button title="Accept request" onPress={() => respond('accepted')} loading={acting} />

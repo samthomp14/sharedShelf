@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { log } from '../../lib/log';
 import { Button } from '../../components/Button';
 import { colors, fonts, radius } from '../../lib/theme';
 
-type Mode = 'sign-in' | 'sign-up';
+type Mode = 'sign-in' | 'sign-up' | 'forgot';
 type Message = { type: 'error' | 'success'; text: string };
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
@@ -27,7 +28,10 @@ export default function SignIn() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<Mode>(inviteCode ? 'sign-up' : 'sign-in');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const { recoveryError } = useAuth();
+  const [message, setMessage] = useState<Message | null>(
+    recoveryError ? { type: 'error', text: recoveryError } : null
+  );
 
   useEffect(() => {
     if (!inviteCode) return;
@@ -66,6 +70,29 @@ export default function SignIn() {
 
   async function handleSubmit() {
     setMessage(null);
+
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setMessage({ type: 'error', text: 'Enter the email you signed up with.' });
+        return;
+      }
+      setLoading(true);
+      // The link comes back to this site's root; AuthProvider picks it up.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined,
+      });
+      setLoading(false);
+      if (error) {
+        log.warn('auth.reset_request_failed', { error: error.message });
+        setMessage({ type: 'error', text: error.message });
+      } else {
+        setMessage({
+          type: 'success',
+          text: `If there's an account for ${email.trim()}, we sent it a link to reset the password.`,
+        });
+      }
+      return;
+    }
 
     if (mode === 'sign-up') {
       if (!USERNAME_PATTERN.test(username)) {
@@ -152,15 +179,22 @@ export default function SignIn() {
         keyboardType="email-address"
         autoComplete="email"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.textFaint}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete={mode === 'sign-in' ? 'password' : 'new-password'}
-      />
+      {mode !== 'forgot' && (
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor={colors.textFaint}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete={mode === 'sign-in' ? 'password' : 'new-password'}
+        />
+      )}
+      {mode === 'sign-in' && (
+        <Pressable onPress={() => switchMode('forgot')} style={styles.forgot} hitSlop={8}>
+          <Text style={styles.forgotText}>Forgot password?</Text>
+        </Pressable>
+      )}
       {mode === 'sign-up' && (
         <TextInput
           style={styles.input}
@@ -180,7 +214,7 @@ export default function SignIn() {
       )}
 
       <Button
-        title={mode === 'sign-in' ? 'Sign in' : 'Sign up'}
+        title={mode === 'sign-in' ? 'Sign in' : mode === 'sign-up' ? 'Sign up' : 'Send reset link'}
         onPress={handleSubmit}
         loading={loading}
         style={styles.submitButton}
@@ -188,7 +222,11 @@ export default function SignIn() {
 
       <Pressable onPress={() => switchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}>
         <Text style={styles.toggle}>
-          {mode === 'sign-in' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          {mode === 'sign-in'
+            ? "Don't have an account? Sign up"
+            : mode === 'sign-up'
+              ? 'Already have an account? Sign in'
+              : 'Back to sign in'}
         </Text>
       </Pressable>
     </View>
@@ -249,6 +287,16 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 8,
+  },
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginBottom: 12,
+  },
+  forgotText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
   },
   toggle: {
     fontFamily: fonts.regular,
