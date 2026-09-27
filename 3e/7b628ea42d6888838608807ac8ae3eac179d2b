@@ -1,0 +1,26 @@
+supabase/migrations/20260927030000_unfriend_cancels_requests.sql
+  s_e23477aef1be2a::t_babf8aa926a5f5 1-31
+app/(app)/profile/[username].tsx
+  s_e23477aef1be2a::t_c349878a9781c3 50,151-163,251-277,353-365
+supabase/schema.sql
+  s_e23477aef1be2a::t_babf8aa926a5f5 240-261,735-738
+  s_e23477aef1be2a::t_c8032825bd1c3a 739
+supabase/tests/unfriend_test.sql
+  s_e23477aef1be2a::t_e720bae3931b90 1-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3e7b628ea42d6888838608807ac8ae3eac179d2b",
+  "prompts": {},
+  "sessions": {
+    "s_e23477aef1be2a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b30c370a-597c-45d1-b511-00ab3350efb9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
