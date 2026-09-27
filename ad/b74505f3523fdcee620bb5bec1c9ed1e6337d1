@@ -1,0 +1,25 @@
+supabase/tests/push_notifications_test.sql
+  s_2de8eb56bf046a::t_63dc29f75cb523 1-19,21,23,25,27-97
+  s_2de8eb56bf046a::t_d0029ac31d5c5c 20,22,24,26
+supabase/migrations/20260926200000_push_notifications.sql
+  s_2de8eb56bf046a::t_9888e5d8f40613 117,125
+  s_2de8eb56bf046a::t_8354bddbebc308 1-116,118-124,126-298
+supabase/schema.sql
+  s_2de8eb56bf046a::t_8a54517d1b10a9 992-994,1193-1457
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "adb74505f3523fdcee620bb5bec1c9ed1e6337d1",
+  "prompts": {},
+  "sessions": {
+    "s_2de8eb56bf046a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d70ec94c-53b6-4b8f-8e46-57398c87be90",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
