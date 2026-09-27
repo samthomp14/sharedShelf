@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from './supabase';
 import { log } from './log';
 import { useAuth } from '../contexts/AuthContext';
 import { useRefetchOnVisible } from './refresh';
+import { onPushReceived, setAppBadge } from './push';
 import {
   fetchBorrowing,
   fetchIncomingRequests,
@@ -185,7 +186,9 @@ export function useNeedsYouCount(): number {
       setCount(0);
       return;
     }
-    setCount(await fetchNeedsYouCount(uid));
+    const next = await fetchNeedsYouCount(uid);
+    setCount(next);
+    setAppBadge(next);
   }, [uid]);
 
   useFocusEffect(
@@ -194,6 +197,7 @@ export function useNeedsYouCount(): number {
     }, [load])
   );
   useRefetchOnVisible(load);
+  useEffect(() => onPushReceived(load), [load]);
 
   return count;
 }

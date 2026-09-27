@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { personName, requestLoan } from '../../lib/loans';
 import type { BookCopy, BookLoan, BookRequest } from '../../lib/bookDetail';
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
 import { Chip } from '../Chip';
+import { PushAfterRequest } from '../PushPrompt';
 import { Skeleton } from '../Skeleton';
 import type { RunStep } from './YourCopyCard';
 import { colors, fonts, organicCorners } from '../../lib/theme';
@@ -37,6 +39,9 @@ interface FriendCopiesProps {
 // are promised, lent or held back all read "Unavailable" — who has it is
 // only for the two people involved.
 export function FriendCopies({ copies, loans, requests, ownsCopy, busy, run }: FriendCopiesProps) {
+  // Set after a request goes through: offers push ("Want to know when Sam answers?").
+  const [askedName, setAskedName] = useState<string | null>(null);
+
   if (ownsCopy && copies.length === 0) return null;
 
   return (
@@ -75,7 +80,16 @@ export function FriendCopies({ copies, loans, requests, ownsCopy, busy, run }: F
                   title="Ask to borrow"
                   variant="secondary"
                   size="compact"
-                  onPress={() => run(`request-${copy.id}`, () => requestLoan(copy.id), `Asked ${name}`)}
+                  onPress={() =>
+                    run(
+                      `request-${copy.id}`,
+                      async () => {
+                        await requestLoan(copy.id);
+                        setAskedName(name.split(' ')[0]);
+                      },
+                      `Asked ${name}`
+                    )
+                  }
                   loading={busy === `request-${copy.id}`}
                   disabled={busy !== null}
                 />
@@ -84,6 +98,7 @@ export function FriendCopies({ copies, loans, requests, ownsCopy, busy, run }: F
           );
         })
       )}
+      {askedName && <PushAfterRequest ownerName={askedName} />}
     </View>
   );
 }

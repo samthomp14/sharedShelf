@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
+import { NotificationSettings } from '../../../components/NotificationSettings';
 import { colors, fonts, inputStyle } from '../../../lib/theme';
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
@@ -85,7 +86,7 @@ export default function ProfileSettings() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <View>
         <Text style={styles.label}>Username</Text>
         <TextInput
@@ -135,20 +136,25 @@ export default function ProfileSettings() {
         {saved && <Text style={styles.savedText}>Saved.</Text>}
 
         <Button title="Save" onPress={save} loading={saving} style={styles.submit} />
+
+        <NotificationSettings uid={uid} />
       </View>
 
       <View style={styles.signOutSection}>
         <Button title="Sign out" variant="secondary" onPress={signOut} />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    justifyContent: 'space-between',
     backgroundColor: colors.background,
+  },
+  container: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
     padding: 16,
   },
   label: {
@@ -185,6 +191,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   signOutSection: {
+    marginTop: 24,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,

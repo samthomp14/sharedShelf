@@ -1195,7 +1195,7 @@ grant execute on function public.set_copy_available(uuid, boolean) to authentica
 -- Push notifications (web push)
 -- ============================================================
 -- Plan: https://claude.ai/code/artifact/5ce2fb9c-2267-4a30-84b1-b3158648e6d1
--- (migration 20260926200000_push_notifications)
+-- (migration 20260927004236_push_notifications)
 --
 -- The database decides who gets a push; the send-push edge function sends it.
 --   * push_subscriptions — one row per device that turned notifications on.

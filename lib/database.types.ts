@@ -168,6 +168,54 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['client_logs']['Insert']>;
         Relationships: [];
       };
+      // Push notifications (see supabase/migrations/*_push_notifications.sql).
+      // push_outbox has no client access, so it isn't listed.
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          site: 'prod' | 'staging';
+          user_agent: string | null;
+          created_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          site?: 'prod' | 'staging';
+          user_agent?: string | null;
+          created_at?: string;
+          last_seen_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['push_subscriptions']['Insert']>;
+        Relationships: [];
+      };
+      notification_prefs: {
+        Row: {
+          user_id: string;
+          borrow_requests: boolean;
+          your_requests: boolean;
+          loans: boolean;
+          friends: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          borrow_requests?: boolean;
+          your_requests?: boolean;
+          loans?: boolean;
+          friends?: boolean;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['notification_prefs']['Insert']>;
+        Relationships: [];
+      };
       book_authors: {
         Row: {
           book_id: string;

@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePushSetup } from '../../lib/push';
 import { colors, fonts, headerHeight } from '../../lib/theme';
 
 // Keep the tabs underneath every pushed screen, even on a deep link or a
@@ -12,6 +14,9 @@ export const unstable_settings = {
 
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
+  // Service worker, this device's push subscription, taps on notifications.
+  usePushSetup(session?.user?.id ?? null);
 
   return (
     <Stack

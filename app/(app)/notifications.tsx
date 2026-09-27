@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -12,9 +12,11 @@ import {
   type BookRef,
 } from '../../lib/loans';
 import { fetchNotifications, type EarlierItem, type NeedsYouItem } from '../../lib/notifications';
+import { onPushReceived, setAppBadge } from '../../lib/push';
 import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
+import { PushCard } from '../../components/PushPrompt';
 import { RefreshControl } from '../../components/RefreshControl';
 import { ToastProvider, useToast } from '../../components/Toast';
 import { CoverThumb } from '../../components/activity/CoverThumb';
@@ -47,6 +49,7 @@ function NotificationsList() {
       return;
     }
     const result = await fetchNotifications(uid);
+    setAppBadge(result.needsYou.length);
     setNeedsYou(result.needsYou);
     setEarlier(result.earlier);
     setLoading(false);
@@ -59,6 +62,7 @@ function NotificationsList() {
   );
   const { refreshing, onRefresh } = useRefreshing(load);
   useRefetchOnVisible(load);
+  useEffect(() => onPushReceived(load), [load]);
 
   // Runs one step on a card, shows its refusal (if any) as a toast, then
   // reloads — the state may have moved on either way. `actingId` is the
@@ -192,6 +196,8 @@ function NotificationsList() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      <PushCard />
+
       {isEmpty && !loading && (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>You're all caught up</Text>
