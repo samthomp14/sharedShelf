@@ -1,0 +1,49 @@
+supabase/schema.sql
+  s_2de8eb56bf046a::t_2bdcea1c9a058e 1198
+app/(app)/notifications.tsx
+  s_2de8eb56bf046a::t_13b91f2134cb1b 1,15,19,52,65,199-200
+lib/notifications.ts
+  s_2de8eb56bf046a::t_13b91f2134cb1b 1,7,189-191,200
+components/book/FriendCopies.tsx
+  s_2de8eb56bf046a::t_30f68f32d16a93 1,8,42-44,83-92
+  s_2de8eb56bf046a::t_655bfd8c460838 101
+tsconfig.json
+  s_2de8eb56bf046a::t_27a2457f25bfed 5-6
+public/sw.js
+  s_2de8eb56bf046a::t_aefc2206ddfec6 1-60
+app/(app)/profile/settings.tsx
+  s_2de8eb56bf046a::t_790965d6182f22 3,7,89,139-140,146,151,154-157,194
+lib/database.types.ts
+  s_2de8eb56bf046a::t_9123a81785bf88 171-218
+components/PushPrompt.tsx
+  s_2de8eb56bf046a::t_fe20af578011eb 1-136
+supabase/functions/send-push/index.ts
+  s_2de8eb56bf046a::t_5834dd09233dc7 1-188
+vercel.json
+  s_2de8eb56bf046a::t_27a2457f25bfed 14-25
+  s_2de8eb56bf046a::t_2d9453fa237b2d 13
+lib/push.ts
+  s_2de8eb56bf046a::t_ba35d8d3485bb6 1-329
+components/NotificationSettings.tsx
+  s_2de8eb56bf046a::t_9a9c8ceb93a10e 56
+  s_2de8eb56bf046a::t_ab5fb38cc180af 52-55,57-58
+  s_2de8eb56bf046a::t_67fdf9da800875 1-51,59-113
+app/(app)/_layout.tsx
+  s_2de8eb56bf046a::t_30f68f32d16a93 3-4,17-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "50f0028848c999d4911eb353f86d952f4fb4b68f",
+  "prompts": {},
+  "sessions": {
+    "s_2de8eb56bf046a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d70ec94c-53b6-4b8f-8e46-57398c87be90",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
