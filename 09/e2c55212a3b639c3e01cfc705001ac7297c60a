@@ -1,0 +1,50 @@
+components/book/YourCopyCard.tsx
+  s_e23477aef1be2a::t_fac3dca68fa56b 13,110-138,175,196,206,213-219,293-294,407
+app/(app)/(tabs)/profile/index.tsx
+  s_e23477aef1be2a::t_ea08db31691c99 45
+app/_layout.tsx
+  s_e23477aef1be2a::t_4438447a596743 21,41,51-53
+  s_e23477aef1be2a::t_3fd832adaf646f 54-55
+lib/loans.ts
+  s_e23477aef1be2a::t_5425358f46f2d9 160-165
+  s_e23477aef1be2a::t_3a6836b21f0c6a 158-159
+app/(app)/profile/settings.tsx
+  s_e23477aef1be2a::t_a451384dc326e9 5,36-42,58,91-105,169-209,258-283,285
+supabase/schema.sql
+  s_e23477aef1be2a::t_e40171b3d1b8f2 1211-1285
+app/(auth)/sign-in.tsx
+  s_e23477aef1be2a::t_4438447a596743 2,5,10,31-34,74-96,182-197,217,225-229,291-300
+supabase/tests/visibility_and_delete_account_test.sql
+  s_e23477aef1be2a::t_7f172aa434df69 1-103
+supabase/migrations/20260927040000_copy_visibility_and_delete_account.sql
+  s_e23477aef1be2a::t_82cce0cd84f110 49
+  s_e23477aef1be2a::t_2ee32c2ea81b0e 1-48,50-72
+app/(app)/profile/[username].tsx
+  s_e23477aef1be2a::t_bf5ceb2bc18bed 235-242
+components/ResetPassword.tsx
+  s_e23477aef1be2a::t_7160850c655836 1-104
+lib/database.types.ts
+  s_e23477aef1be2a::t_0b088ff4f11163 108-115
+supabase/migrations/20260927041000_delete_account_shelf_first.sql
+  s_e23477aef1be2a::t_82cce0cd84f110 1-28
+lib/bookDetail.ts
+  s_e23477aef1be2a::t_fac3dca68fa56b 20,66
+contexts/AuthContext.tsx
+  s_e23477aef1be2a::t_23dec6e213c5ca 2,5,10-15,18-44,49-50,53-74,77-78,84-87,91-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "09e2c55212a3b639c3e01cfc705001ac7297c60a",
+  "prompts": {},
+  "sessions": {
+    "s_e23477aef1be2a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b30c370a-597c-45d1-b511-00ab3350efb9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
