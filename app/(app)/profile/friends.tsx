@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { profileHref } from '../../../lib/profileHref';
@@ -18,47 +18,43 @@ interface FriendRow {
   avatarUrl: string | null;
 }
 
+// Your friends, or (with an `id` param) a friend's friends. friends_of only
+// answers for yourself or someone you're friends with.
 export default function Friends() {
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user?.id ?? null;
+  const { id: otherId, name: otherName } = useLocalSearchParams<{ id?: string; name?: string }>();
+  const target = otherId || uid;
+  const isOwn = target === uid;
   const [friends, setFriends] = useState<FriendRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    if (!uid) {
+    if (!target) {
       setLoading(false);
       setHasLoaded(true);
       return;
     }
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('friendships')
-      .select(
-        'id, requester_id, addressee_id, requester:profiles!friendships_requester_id_fkey(id, username, display_name, avatar_url), addressee:profiles!friendships_addressee_id_fkey(id, username, display_name, avatar_url)'
-      )
-      .eq('status', 'accepted')
-      .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`);
+    const { data, error } = await supabase.rpc('friends_of', { target });
 
     if (!error && data) {
-      const rows: FriendRow[] = data.map((row: any) => {
-        const isRequester = row.requester_id === uid;
-        const friend = isRequester ? row.addressee : row.requester;
-        return {
+      setFriends(
+        data.map((friend) => ({
           friendId: friend.id,
           username: friend.username,
           displayName: friend.display_name,
           avatarUrl: friend.avatar_url,
-        };
-      });
-      setFriends(rows);
+        }))
+      );
     }
 
     setLoading(false);
     setHasLoaded(true);
-  }, [uid]);
+  }, [target]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,12 +90,18 @@ export default function Friends() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
-          friends.length > 0 ? (
+          !isOwn ? (
+            <Text style={styles.title}>{otherName ? `${otherName}'s friends` : 'Friends'}</Text>
+          ) : friends.length > 0 ? (
             <ShareAppButton title="Invite friends to sharedShelf" variant="secondary" style={styles.invite} />
           ) : null
         }
         ListEmptyComponent={
-          !loading ? (
+          loading ? null : !isOwn ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No friends yet</Text>
+            </View>
+          ) : (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No friends yet</Text>
               <Text style={styles.emptyBody}>
@@ -107,7 +109,7 @@ export default function Friends() {
               </Text>
               <ShareAppButton style={styles.emptyInvite} />
             </View>
-          ) : null
+          )
         }
         renderItem={({ item }) => (
           <Pressable
@@ -140,6 +142,7 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   username: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, marginTop: 2 },
   invite: { marginBottom: 8 },
+  title: { fontFamily: fonts.displaySemibold, fontSize: 20, color: colors.text, marginBottom: 4 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text, marginBottom: 8 },
   emptyBody: {

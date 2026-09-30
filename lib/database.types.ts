@@ -32,6 +32,10 @@ export interface Database {
         Args: { target: string };
         Returns: number;
       };
+      friends_of: {
+        Args: { target: string };
+        Returns: { id: string; username: string; display_name: string | null; avatar_url: string | null }[];
+      };
       normalize_isbn: {
         Args: { raw: string };
         Returns: string | null;

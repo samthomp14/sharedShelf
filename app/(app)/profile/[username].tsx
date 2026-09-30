@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Avatar } from '../../../components/Avatar';
@@ -10,6 +10,7 @@ import { Skeleton, SkeletonText } from '../../../components/Skeleton';
 import { RefreshControl } from '../../../components/RefreshControl';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts } from '../../../lib/theme';
+import { firstName } from '../../../lib/loans';
 import type { CopyLendStatus } from '../../../lib/database.types';
 
 interface OtherProfile {
@@ -206,10 +207,18 @@ export default function UserProfile() {
                   <Text style={styles.statLabel}>{items?.length === 1 ? 'book' : 'books'}</Text>
                 </View>
               )}
-              <View style={styles.stat}>
+              {/* Only friends can open the list (friends_of enforces it too). */}
+              <Pressable
+                style={styles.stat}
+                disabled={!isFriends || !profile}
+                onPress={() =>
+                  profile &&
+                  router.push({ pathname: '/profile/friends', params: { id: profile.id, name: firstName(profile) } })
+                }
+              >
                 <Text style={styles.statNumber}>{friendCount ?? 0}</Text>
                 <Text style={styles.statLabel}>{friendCount === 1 ? 'friend' : 'friends'}</Text>
-              </View>
+              </Pressable>
             </>
           )}
         </View>
