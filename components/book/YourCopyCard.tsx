@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import {
   acceptRequest,
@@ -14,6 +14,7 @@ import {
   type Person,
 } from '../../lib/loans';
 import type { BookCopy, BookLoan, BookRequest } from '../../lib/bookDetail';
+import { removeFromShelf } from '../../lib/bookLookup';
 import { duration, timeAgo } from '../../lib/time';
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
@@ -136,6 +137,52 @@ function VisibilityRow({ copy, busy, run }: { copy: BookCopy; busy: string | nul
   );
 }
 
+// Take the copy off your shelf, behind an inline confirm. Deleting the row
+// fires a trigger that closes any loan with 'removed' and declines requests.
+function RemoveRow({ copy, loan, busy, run }: { copy: BookCopy; loan: BookLoan | null; busy: string | null; run: RunStep }) {
+  const [confirming, setConfirming] = useState(false);
+  const key = `remove-${copy.id}`;
+  const disabled = busy !== null;
+
+  if (!confirming) {
+    return (
+      <View style={styles.footer}>
+        <Pressable
+          onPress={() => setConfirming(true)}
+          disabled={disabled}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.footerButton, (pressed || disabled) && styles.dimmed]}
+        >
+          <Text style={styles.removeText}>Remove from your shelf</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const name = loan ? firstName(loan.borrower) : null;
+  return (
+    <View style={styles.divided}>
+      <Text style={styles.rowTitle}>Remove this copy?</Text>
+      <Text style={styles.note}>
+        {loan
+          ? `This also closes the loan with ${name}. Their history keeps a note that you removed it.`
+          : 'Anyone who asked to borrow it will be declined. You can add it again any time.'}
+      </Text>
+      <View style={[styles.actions, styles.confirmActions]}>
+        <Button
+          title="Remove"
+          size="compact"
+          onPress={() => run(key, () => removeFromShelf(copy.id), 'Removed from your shelf')}
+          loading={busy === key}
+          disabled={disabled}
+          style={styles.removeButton}
+        />
+        <Button title="Keep it" size="compact" variant="ghost" onPress={() => setConfirming(false)} disabled={disabled} />
+      </View>
+    </View>
+  );
+}
+
 interface OwnedCopyCardProps {
   copy: BookCopy;
   loan: BookLoan | null;
@@ -173,6 +220,7 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
           />
         </View>
         <VisibilityRow copy={copy} busy={busy} run={run} />
+        <RemoveRow copy={copy} loan={loan} busy={busy} run={run} />
       </Card>
     );
   }
@@ -194,6 +242,7 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
           disabled={disabled}
         />
         <VisibilityRow copy={copy} busy={busy} run={run} />
+        <RemoveRow copy={copy} loan={loan} busy={busy} run={run} />
       </Card>
     );
   }
@@ -292,6 +341,7 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
       )}
 
       <VisibilityRow copy={copy} busy={busy} run={run} />
+      <RemoveRow copy={copy} loan={null} busy={busy} run={run} />
     </Card>
   );
 }
@@ -458,5 +508,8 @@ const styles = StyleSheet.create({
   footerText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
   chevron: { fontFamily: fonts.semibold, fontSize: 18, lineHeight: 20, color: colors.text },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  confirmActions: { marginTop: 12 },
+  removeText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.danger },
+  removeButton: { backgroundColor: colors.danger, borderColor: colors.danger },
   startAligned: { alignSelf: 'flex-start', paddingHorizontal: 2, marginTop: -6 },
 });
