@@ -19,6 +19,7 @@ interface OtherProfile {
   display_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  is_public: boolean;
 }
 
 interface ShelfItemRow {
@@ -55,7 +56,7 @@ export default function UserProfile() {
 
     const profileResult = await supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, bio')
+      .select('id, username, display_name, avatar_url, bio, is_public')
       .eq('username', username)
       .single();
 
@@ -82,19 +83,21 @@ export default function UserProfile() {
             .or(`and(requester_id.eq.${ownerId},addressee_id.eq.${targetId}),and(requester_id.eq.${targetId},addressee_id.eq.${ownerId})`)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
-      supabase
-        .from('shelf_items')
-        .select('id, lend_status, book:books(id, title, cover_url)')
-        .eq('owner_id', targetId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false }),
+      // Empty unless you're friends or their profile is public.
+      supabase.rpc('profile_shelf', { target: targetId }),
     ]);
 
     if (!countResult.error && typeof countResult.data === 'number') {
       setFriendCount(countResult.data);
     }
     if (!itemsResult.error && itemsResult.data) {
-      setItems(itemsResult.data as unknown as ShelfItemRow[]);
+      setItems(
+        itemsResult.data.map((row) => ({
+          id: row.id,
+          lend_status: row.lend_status,
+          book: { id: row.book_id, title: row.title, cover_url: row.cover_url },
+        }))
+      );
     }
 
     if (friendshipResult.data) {
@@ -178,6 +181,9 @@ export default function UserProfile() {
   const avatarUrl = profile ? profile.avatar_url : placeholderAvatarUrl || null;
   const detailsLoaded = status !== null;
   const isFriends = status === 'friends';
+  // Friends always see the shelf and friends list; everyone else only on a
+  // public profile.
+  const canSeeShelf = isFriends || !!profile?.is_public;
 
   return (
     <ScrollView
@@ -201,16 +207,16 @@ export default function UserProfile() {
             </>
           ) : (
             <>
-              {isFriends && (
+              {canSeeShelf && (
                 <View style={styles.stat}>
                   <Text style={styles.statNumber}>{items?.length ?? 0}</Text>
                   <Text style={styles.statLabel}>{items?.length === 1 ? 'book' : 'books'}</Text>
                 </View>
               )}
-              {/* Only friends can open the list (friends_of enforces it too). */}
+              {/* friends_of enforces the same rule. */}
               <Pressable
                 style={styles.stat}
-                disabled={!isFriends || !profile}
+                disabled={!canSeeShelf || !profile}
                 onPress={() =>
                   profile &&
                   router.push({ pathname: '/profile/friends', params: { id: profile.id, name: firstName(profile) } })
@@ -260,7 +266,9 @@ export default function UserProfile() {
               />
             </>
           )}
-          <Text style={styles.hint}>Add each other as friends to see their shelf.</Text>
+          <Text style={styles.hint}>
+            {canSeeShelf ? 'Add each other as friends to borrow books.' : 'Add each other as friends to see their shelf.'}
+          </Text>
         </View>
       )}
 
@@ -291,14 +299,16 @@ export default function UserProfile() {
         </View>
       )}
 
-      {detailsLoaded && isFriends && (
+      {detailsLoaded && canSeeShelf && (
         <View style={styles.grid}>
           <ShelfGrid
             items={(items ?? []).map((item) => ({
               id: item.id,
               book: item.book,
-              // Friends never learn who has a copy, or why it's off.
-              badge: item.lend_status === 'available' ? null : { kind: 'unavailable', label: 'Unavailable' },
+              // Friends never learn who has a copy, or why it's off. Non-friends
+              // can't borrow, so they get no badge at all.
+              badge:
+                isFriends && item.lend_status !== 'available' ? { kind: 'unavailable', label: 'Unavailable' } : null,
             }))}
             emptyText="This shelf is empty so far."
           />

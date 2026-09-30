@@ -15,6 +15,9 @@ create table public.profiles (
   display_name text,
   avatar_url text,
   bio text,
+  -- Public: any signed-in user sees your shelf and friends list. Private
+  -- (default): friends only. See can_view_profile.
+  is_public boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -237,9 +240,26 @@ $$;
 
 revoke execute on function public.friend_count(uuid) from public, anon;
 
--- Helper: a user's accepted friends, visible to them and to their friends
--- only (the friendships select policy hides other people's rows).
-create function public.friends_of(target uuid)
+-- Public profiles: any signed-in user can see a public profile's shelf and
+-- friends list; private ones (the default) are friends only. Friend
+-- requests still need accepting and borrowing stays friends-only.
+-- shelf_items RLS stays friends-only, so the feed and book pages only show
+-- friends' copies; other people's shelves go through profile_shelf.
+-- Can the caller see this user's shelf and friends list?
+create function public.can_view_profile(target uuid)
+returns boolean
+language sql
+security definer set search_path = ''
+stable
+as $$
+  select (select auth.uid()) = target
+    or public.are_friends((select auth.uid()), target)
+    or exists (select 1 from public.profiles where id = target and is_public);
+$$;
+
+revoke execute on function public.can_view_profile(uuid) from public, anon;
+
+create or replace function public.friends_of(target uuid)
 returns table (id uuid, username text, display_name text, avatar_url text)
 language sql
 security definer set search_path = ''
@@ -251,11 +271,28 @@ as $$
     on p.id = case when f.requester_id = target then f.addressee_id else f.requester_id end
   where f.status = 'accepted'
     and (f.requester_id = target or f.addressee_id = target)
-    and ((select auth.uid()) = target or public.are_friends((select auth.uid()), target))
+    and public.can_view_profile(target)
   order by coalesce(p.display_name, p.username);
 $$;
 
-revoke execute on function public.friends_of(uuid) from public, anon;
+-- Someone's shelf as their profile page shows it: visible copies only, in
+-- their order. Empty unless can_view_profile.
+create function public.profile_shelf(target uuid)
+returns table (id uuid, lend_status public.copy_lend_status, book_id uuid, title text, cover_url text)
+language sql
+security definer set search_path = ''
+stable
+as $$
+  select s.id, s.lend_status, b.id, b.title, b.cover_url
+  from public.shelf_items s
+  join public.books b on b.id = s.book_id
+  where s.owner_id = target
+    and s.visibility = 'friends'
+    and public.can_view_profile(target)
+  order by s.sort_order, s.created_at desc;
+$$;
+
+revoke execute on function public.profile_shelf(uuid) from public, anon;
 
 -- Unfriending (deleting an accepted row) cancels pending borrow requests
 -- between the two. Promised and handed-over loans stay so the book can

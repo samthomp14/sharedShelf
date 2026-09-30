@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 import { log } from '../../../lib/log';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -40,6 +40,9 @@ export default function ProfileSettings() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // The saved username, which is what you type to confirm (not the field above).
   const [savedUsername, setSavedUsername] = useState(params.username ?? '');
+  // Public profile: saves as soon as it's flipped, like the notification switches.
+  const [isPublic, setIsPublic] = useState<boolean | null>(null);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -51,11 +54,14 @@ export default function ProfileSettings() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('username, display_name, bio')
+      .select('username, display_name, bio, is_public')
       .eq('id', uid)
       .single();
 
-    if (data) setSavedUsername(data.username);
+    if (data) {
+      setSavedUsername(data.username);
+      setIsPublic(data.is_public);
+    }
     if (data && !dirty) {
       setUsername(data.username);
       setDisplayName(data.display_name ?? '');
@@ -89,6 +95,18 @@ export default function ProfileSettings() {
 
     setSaved(true);
     setSavedUsername(username);
+  }
+
+  async function setProfilePublic(next: boolean) {
+    if (!uid) return;
+    setPrivacyError(null);
+    setIsPublic(next);
+    const { error: updateError } = await supabase.from('profiles').update({ is_public: next }).eq('id', uid);
+    if (updateError) {
+      log.error('profile.privacy_failed', { error: updateError.message });
+      setIsPublic(!next);
+      setPrivacyError(updateError.message);
+    }
   }
 
   async function deleteAccount() {
@@ -160,6 +178,27 @@ export default function ProfileSettings() {
         {saved && <Text style={styles.savedText}>Saved.</Text>}
 
         <Button title="Save" onPress={save} loading={saving} style={styles.submit} />
+
+        <Text style={styles.sectionHeading}>Privacy</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.flex}>
+            <Text style={styles.switchLabel}>Public profile</Text>
+            <Text style={styles.switchHint}>
+              {isPublic
+                ? 'Anyone on sharedShelf can see your shelf and friends. Only friends can borrow.'
+                : 'Only friends can see your shelf and friends.'}
+            </Text>
+          </View>
+          <Switch
+            value={!!isPublic}
+            disabled={isPublic === null}
+            onValueChange={setProfilePublic}
+            trackColor={{ false: colors.chipBackground, true: colors.text }}
+            thumbColor={colors.background}
+            accessibilityLabel="Public profile"
+          />
+        </View>
+        {privacyError && <Text style={styles.errorText}>{privacyError}</Text>}
 
         <NotificationSettings uid={uid} />
       </View>
@@ -254,6 +293,32 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 20,
+  },
+  // Matches NotificationSettings' heading and rows.
+  sectionHeading: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 6,
+    marginTop: 24,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  flex: { flex: 1 },
+  switchLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.text,
+  },
+  switchHint: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   deleteBox: {
     marginTop: 8,

@@ -36,6 +36,16 @@ export interface Database {
         Args: { target: string };
         Returns: { id: string; username: string; display_name: string | null; avatar_url: string | null }[];
       };
+      profile_shelf: {
+        Args: { target: string };
+        Returns: {
+          id: string;
+          lend_status: CopyLendStatus;
+          book_id: string;
+          title: string;
+          cover_url: string | null;
+        }[];
+      };
       normalize_isbn: {
         Args: { raw: string };
         Returns: string | null;
@@ -126,6 +136,7 @@ export interface Database {
           display_name: string | null;
           avatar_url: string | null;
           bio: string | null;
+          is_public: boolean;
           created_at: string;
         };
         Insert: {
@@ -134,6 +145,7 @@ export interface Database {
           display_name?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
+          is_public?: boolean;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
