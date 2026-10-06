@@ -6,7 +6,7 @@ import { Button } from './Button';
 const KINDS: { key: PrefKey; label: string; hint: string }[] = [
   { key: 'borrow_requests', label: 'Borrow requests', hint: 'A friend asks to borrow one of your books' },
   { key: 'your_requests', label: 'Your requests', hint: 'A friend says yes or no to your request' },
-  { key: 'loans', label: 'Loans', hint: 'A friend lends you a book or calls off a hand-off' },
+  { key: 'loans', label: 'Loans', hint: 'A friend lends you a book, calls off a hand-off, or a return needs confirming' },
   { key: 'friends', label: 'Friends', hint: 'Friend requests and new friends' },
 ];
 

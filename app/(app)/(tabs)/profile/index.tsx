@@ -21,6 +21,8 @@ import {
   firstName,
   markHandedOver,
   markReturned,
+  denyReturn,
+  claimReturned,
   type ActiveLoan,
   type MyCopy,
   type OutgoingRequest,
@@ -224,6 +226,7 @@ function ProfileScreen() {
           actingId={actingId}
           onHandedOver={(loan) => runLoanStep(loan.id, () => markHandedOver(loan.id))}
           onReturned={(loan) => runLoanStep(loan.id, () => markReturned(loan.id))}
+          onNotYet={(loan) => runLoanStep(loan.id, () => denyReturn(loan.id))}
           emptyText="Nothing lent out right now. When you say yes to a friend, the book shows up here."
         />
       )}
@@ -233,6 +236,7 @@ function ProfileScreen() {
           requests={requests}
           actingId={actingId}
           onGotIt={(loan) => runLoanStep(loan.id, () => markHandedOver(loan.id))}
+          onReturned={(loan) => runLoanStep(loan.id, () => claimReturned(loan.id))}
           onCancelRequest={(request) => runLoanStep(request.id, () => cancelRequest(request.id))}
           emptyText="You're not borrowing anything. Spot something on a friend's shelf and ask to borrow it."
         />

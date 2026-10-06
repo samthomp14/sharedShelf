@@ -42,6 +42,7 @@ export interface ActiveLoan {
   shelf_item_id: string | null;
   created_at: string; // when it was promised (or lent, for a direct lend)
   handed_over_at: string | null; // null = promised, not handed over yet
+  return_claimed_at: string | null; // borrower says it's back; waiting on the owner
   owner: Person | null;
   borrower: Person | null;
   book: BookRef | null;
@@ -73,7 +74,7 @@ export interface MyRequest {
 
 const PERSON = 'id, username, display_name, avatar_url';
 const BOOK = 'id, title, authors, cover_url';
-const LOAN_FIELDS = `id, shelf_item_id, created_at, handed_over_at, book:books(${BOOK}), owner:profiles!loans_v2_owner_id_fkey(${PERSON}), borrower:profiles!loans_v2_borrower_id_fkey(${PERSON})`;
+const LOAN_FIELDS = `id, shelf_item_id, created_at, handed_over_at, return_claimed_at, book:books(${BOOK}), owner:profiles!loans_v2_owner_id_fkey(${PERSON}), borrower:profiles!loans_v2_borrower_id_fkey(${PERSON})`;
 const REQUEST_FIELDS = `id, shelf_item_id, created_at, book:books(${BOOK}), requester:profiles!loan_requests_v2_requester_id_fkey(${PERSON})`;
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,18 @@ export async function markReturned(loanId: string): Promise<void> {
   await step('returned', { loanId }, () => supabase.rpc('mark_returned', { p_loan_id: loanId }));
 }
 
+// Borrower: "I returned it". The loan stays open (and drops off your
+// Borrowing list) until the owner confirms with markReturned or says
+// denyReturn, which puts it back on your list.
+export async function claimReturned(loanId: string): Promise<void> {
+  await step('claim_returned', { loanId }, () => supabase.rpc('claim_returned', { p_loan_id: loanId }));
+}
+
+// Owner: "not yet" to a borrower's claimed return.
+export async function denyReturn(loanId: string): Promise<void> {
+  await step('deny_return', { loanId }, () => supabase.rpc('deny_return', { p_loan_id: loanId }));
+}
+
 // Owner: switch a copy between available and unavailable (not while it's
 // promised or on loan). Going unavailable declines pending requests.
 export async function setCopyAvailable(shelfItemId: string, available: boolean): Promise<void> {
@@ -215,12 +228,15 @@ export async function fetchLentOut(uid: string): Promise<ActiveLoan[]> {
 }
 
 // Books you're borrowing (promised to you or in your hands), newest first.
+// One you've said you returned is out of your hands, so it's left off until
+// the owner confirms (gone for good) or denies (back here).
 export async function fetchBorrowing(uid: string): Promise<ActiveLoan[]> {
   const { data, error } = await supabase
     .from('loans_v2')
     .select(LOAN_FIELDS)
     .eq('borrower_id', uid)
     .is('ended_at', null)
+    .is('return_claimed_at', null)
     .order('created_at', { ascending: false });
   if (error) fail('borrowing', error);
   return (data ?? []) as unknown as ActiveLoan[];

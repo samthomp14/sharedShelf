@@ -4,7 +4,9 @@ import {
   acceptRequest,
   callOffLoan,
   cancelRequest,
+  claimReturned,
   declineRequest,
+  denyReturn,
   firstName,
   markHandedOver,
   markReturned,
@@ -226,21 +228,43 @@ export function OwnedCopyCard({ copy, loan, requests, busy, run, onLendToFriend 
   }
 
   if (copy.lend_status === 'on_loan' && loan) {
+    const claimed = !!loan.return_claimed_at;
+    const confirmReturn = (
+      <Button
+        title={claimed ? 'Confirm return' : 'Mark returned'}
+        onPress={() => run(`return-${loan.id}`, () => markReturned(loan.id), 'Back on your shelf')}
+        loading={busy === `return-${loan.id}`}
+        disabled={disabled}
+        style={claimed ? styles.flex : undefined}
+      />
+    );
     return (
       <Card label="Your copy">
         <PersonHeading
           person={loan.borrower}
-          heading={`With ${personName(loan.borrower)}`}
-          note={outSince(loan.handed_over_at ?? loan.created_at)}
+          heading={claimed ? `${personName(loan.borrower)} says it's back` : `With ${personName(loan.borrower)}`}
+          note={
+            claimed
+              ? `Said ${timeAgo(loan.return_claimed_at!)}. Is it back on your shelf?`
+              : outSince(loan.handed_over_at ?? loan.created_at)
+          }
           noteAccent
         />
         <LoanTimeline steps={ownerSteps(loan)} />
-        <Button
-          title="Mark returned"
-          onPress={() => run(`return-${loan.id}`, () => markReturned(loan.id), 'Back on your shelf')}
-          loading={busy === `return-${loan.id}`}
-          disabled={disabled}
-        />
+        {claimed ? (
+          <View style={styles.actions}>
+            {confirmReturn}
+            <Button
+              title="Not yet"
+              variant="ghost"
+              onPress={() => run(`notyet-${loan.id}`, () => denyReturn(loan.id), `Sent back to ${firstName(loan.borrower)}`)}
+              loading={busy === `notyet-${loan.id}`}
+              disabled={disabled}
+            />
+          </View>
+        ) : (
+          confirmReturn
+        )}
         <VisibilityRow copy={copy} busy={busy} run={run} />
         <RemoveRow copy={copy} loan={loan} busy={busy} run={run} />
       </Card>
@@ -357,6 +381,18 @@ export function BorrowingCard({ loan, busy, run }: BorrowingCardProps) {
   const disabled = busy !== null;
   const name = firstName(loan.owner);
 
+  if (loan.handed_over_at && loan.return_claimed_at) {
+    return (
+      <Card label="Returning">
+        <PersonHeading
+          person={loan.owner}
+          heading={`Waiting on ${name}`}
+          note={`You said you returned it ${timeAgo(loan.return_claimed_at)}. It's gone from your Borrowing list once ${name} confirms.`}
+        />
+      </Card>
+    );
+  }
+
   if (loan.handed_over_at) {
     return (
       <Card label="Borrowing">
@@ -365,6 +401,13 @@ export function BorrowingCard({ loan, busy, run }: BorrowingCardProps) {
           heading={`Borrowing from ${name}`}
           note={outSince(loan.handed_over_at)}
           noteAccent
+        />
+        <Button
+          title="I returned it"
+          variant="secondary"
+          onPress={() => run(`returned-${loan.id}`, () => claimReturned(loan.id), `Waiting for ${name} to confirm`)}
+          loading={busy === `returned-${loan.id}`}
+          disabled={disabled}
         />
       </Card>
     );

@@ -23,13 +23,19 @@ interface LentOutListProps {
   actingId: string | null;
   onHandedOver: (loan: ActiveLoan) => void;
   onReturned: (loan: ActiveLoan) => void;
+  onNotYet: (loan: ActiveLoan) => void;
   emptyText: string;
 }
 
-export function LentOutList({ loans, actingId, onHandedOver, onReturned, emptyText }: LentOutListProps) {
+export function LentOutList({ loans, actingId, onHandedOver, onReturned, onNotYet, emptyText }: LentOutListProps) {
   // Waiting longest first in both: the oldest promise, the longest out.
   const toHandOver = loans.filter((l) => !l.handed_over_at).sort((a, b) => oldestFirst(a.created_at, b.created_at));
-  const outNow = loans.filter((l) => l.handed_over_at).sort((a, b) => oldestFirst(since(a), since(b)));
+  const toConfirm = loans
+    .filter((l) => l.return_claimed_at)
+    .sort((a, b) => oldestFirst(a.return_claimed_at!, b.return_claimed_at!));
+  const outNow = loans
+    .filter((l) => l.handed_over_at && !l.return_claimed_at)
+    .sort((a, b) => oldestFirst(since(a), since(b)));
 
   if (loans.length === 0) {
     return <Text style={styles.emptyText}>{emptyText}</Text>;
@@ -57,6 +63,41 @@ export function LentOutList({ loans, actingId, onHandedOver, onReturned, emptyTe
                   loading={actingId === loan.id}
                   onPress={() => onHandedOver(loan)}
                 />
+              }
+            />
+          ))}
+        </Section>
+      )}
+      {toConfirm.length > 0 && (
+        <Section title="Back?">
+          {toConfirm.map((loan) => (
+            <LoanRow
+              key={loan.id}
+              book={loan.book}
+              person={loan.borrower}
+              who={
+                <>
+                  <Text style={styles.name}>{firstName(loan.borrower)}</Text> says it's back ·{' '}
+                  {durationAgo(loan.return_claimed_at!)}
+                </>
+              }
+              action={
+                <View style={styles.stackedActions}>
+                  <Button
+                    title="Confirm"
+                    variant="secondary"
+                    size="compact"
+                    loading={actingId === loan.id}
+                    onPress={() => onReturned(loan)}
+                  />
+                  <Button
+                    title="Not yet"
+                    variant="ghost"
+                    size="compact"
+                    disabled={actingId === loan.id}
+                    onPress={() => onNotYet(loan)}
+                  />
+                </View>
               }
             />
           ))}
@@ -100,11 +141,12 @@ interface BorrowingListProps {
   requests: OutgoingRequest[];
   actingId: string | null;
   onGotIt: (loan: ActiveLoan) => void;
+  onReturned: (loan: ActiveLoan) => void;
   onCancelRequest: (request: OutgoingRequest) => void;
   emptyText: string;
 }
 
-export function BorrowingList({ loans, requests, actingId, onGotIt, onCancelRequest, emptyText }: BorrowingListProps) {
+export function BorrowingList({ loans, requests, actingId, onGotIt, onReturned, onCancelRequest, emptyText }: BorrowingListProps) {
   const toPickUp = loans.filter((l) => !l.handed_over_at).sort((a, b) => oldestFirst(a.created_at, b.created_at));
   const reading = loans.filter((l) => l.handed_over_at).sort((a, b) => oldestFirst(since(a), since(b)));
 
@@ -150,6 +192,15 @@ export function BorrowingList({ loans, requests, actingId, onGotIt, onCancelRequ
                 <>
                   From <Text style={styles.name}>{firstName(loan.owner)}</Text> · {duration(since(loan))}
                 </>
+              }
+              action={
+                <Button
+                  title="I returned it"
+                  variant="secondary"
+                  size="compact"
+                  loading={actingId === loan.id}
+                  onPress={() => onReturned(loan)}
+                />
               }
             />
           ))}
@@ -270,6 +321,9 @@ const styles = StyleSheet.create({
   },
   faded: {
     opacity: 0.7,
+  },
+  stackedActions: {
+    alignItems: 'center',
   },
   cover: {
     width: 56,

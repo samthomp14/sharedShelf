@@ -20,7 +20,9 @@ type Kind =
   | 'hand_off_called_off'
   | 'friend_request'
   | 'friend_accepted'
-  | 'invite_joined';
+  | 'invite_joined'
+  | 'return_claimed'
+  | 'return_denied';
 
 // Which notification_prefs switch covers each kind.
 const PREF: Record<Kind, 'borrow_requests' | 'your_requests' | 'loans' | 'friends'> = {
@@ -32,6 +34,8 @@ const PREF: Record<Kind, 'borrow_requests' | 'your_requests' | 'loans' | 'friend
   friend_request: 'friends',
   friend_accepted: 'friends',
   invite_joined: 'friends',
+  return_claimed: 'loans',
+  return_denied: 'loans',
 };
 
 interface Person {
@@ -78,6 +82,10 @@ function compose(
       return { title: `${who} lent you ${title}`, body: 'Enjoy it.', url: onBook, tag: `loan-${data.loan_id}` };
     case 'hand_off_called_off':
       return { title: `${who} called off the ${title} hand-off`, body: '', url: onBook, tag: `loan-${data.loan_id}` };
+    case 'return_claimed':
+      return { title: `${who} says they returned ${title}`, body: 'Tap to confirm.', url: '/notifications', tag: `loan-${data.loan_id}` };
+    case 'return_denied':
+      return { title: `${who} says ${title} hasn't come back yet`, body: '', url: onBook, tag: `loan-${data.loan_id}` };
     case 'friend_request':
       return { title: `${who} wants to be friends`, body: 'Tap to answer.', url: '/notifications', tag: `friend-${actor?.username}` };
     case 'friend_accepted':

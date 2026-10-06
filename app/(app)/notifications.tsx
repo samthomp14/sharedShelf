@@ -7,7 +7,9 @@ import {
   acceptRequest,
   callOffLoan,
   declineRequest,
+  denyReturn,
   markHandedOver,
+  markReturned,
   personName,
   type BookRef,
 } from '../../lib/loans';
@@ -152,6 +154,37 @@ function NotificationsList() {
               variant="ghost"
               size="compact"
               onPress={() => runStep(item.key, () => callOffLoan(loan.id))}
+              disabled={busy}
+            />
+          </NeedsYouCard>
+        );
+      }
+      case 'confirm_return': {
+        const { loan } = item;
+        return (
+          <NeedsYouCard
+            key={item.key}
+            eyebrow="Returned?"
+            book={loan.book}
+            line={
+              <>
+                {loan.borrower ? <PersonLink person={loan.borrower} /> : 'Someone'} says they returned it
+              </>
+            }
+            timestamp={timeAgo(item.timestamp)}
+          >
+            <Button
+              title="Confirm"
+              variant="secondary"
+              size="compact"
+              onPress={() => runStep(item.key, () => markReturned(loan.id))}
+              loading={busy}
+            />
+            <Button
+              title="Not yet"
+              variant="ghost"
+              size="compact"
+              onPress={() => runStep(item.key, () => denyReturn(loan.id))}
               disabled={busy}
             />
           </NeedsYouCard>

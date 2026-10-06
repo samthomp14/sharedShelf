@@ -810,13 +810,17 @@ create table public.loans_v2 (
   ended_at timestamptz,
   ended_reason text,
   ended_by uuid references public.profiles (id) on delete set null,
+  -- Borrower said "I returned it"; the owner hasn't confirmed or denied yet.
+  return_claimed_at timestamptz,
   constraint loans_v2_not_own_copy check (owner_id <> borrower_id),
   constraint loans_v2_ended_reason_check
     check (ended_reason is null or ended_reason in ('returned', 'called_off', 'removed')),
   constraint loans_v2_ended_consistent
     check ((ended_at is null) = (ended_reason is null)),
   constraint loans_v2_returned_was_handed_over
-    check (ended_reason is distinct from 'returned' or handed_over_at is not null)
+    check (ended_reason is distinct from 'returned' or handed_over_at is not null),
+  constraint loans_v2_claim_was_handed_over
+    check (return_claimed_at is null or handed_over_at is not null)
 );
 
 -- At most one active loan per copy.
@@ -1220,6 +1224,52 @@ begin
 end;
 $$;
 
+-- Borrower: "I returned it". Waits on the owner.
+create function public.claim_returned(p_loan_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_loan public.loans_v2;
+begin
+  v_loan := public._lock_active_loan_v2(p_loan_id);
+  if v_loan.borrower_id <> auth.uid() then
+    raise exception 'Only the borrower can say they returned a book.' using errcode = '42501';
+  end if;
+  if v_loan.handed_over_at is null then
+    raise exception 'The book hasn''t been handed over yet.' using errcode = '55000';
+  end if;
+  if v_loan.return_claimed_at is not null then
+    raise exception 'You''ve already said you returned this. Waiting for the owner to confirm.'
+      using errcode = '55000';
+  end if;
+
+  update public.loans_v2 set return_claimed_at = now() where id = p_loan_id;
+end;
+$$;
+
+-- Owner: "not yet". The loan goes back to the borrower's list.
+create function public.deny_return(p_loan_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_loan public.loans_v2;
+begin
+  v_loan := public._lock_active_loan_v2(p_loan_id);
+  if v_loan.owner_id <> auth.uid() then
+    raise exception 'Only the owner can say a book hasn''t come back.' using errcode = '42501';
+  end if;
+  if v_loan.return_claimed_at is null then
+    raise exception 'Nobody has said they returned this.' using errcode = '55000';
+  end if;
+
+  update public.loans_v2 set return_claimed_at = null where id = p_loan_id;
+end;
+$$;
+
 -- Owner toggles a copy between available and unavailable. Going unavailable
 -- declines pending requests.
 create function public.set_copy_available(p_shelf_item_id uuid, p_available boolean)
@@ -1264,6 +1314,8 @@ revoke execute on function public.call_off_loan(uuid) from public, anon;
 revoke execute on function public.mark_handed_over(uuid) from public, anon;
 revoke execute on function public.lend_to_friend(uuid, uuid) from public, anon;
 revoke execute on function public.mark_returned(uuid) from public, anon;
+revoke execute on function public.claim_returned(uuid) from public, anon;
+revoke execute on function public.deny_return(uuid) from public, anon;
 revoke execute on function public.set_copy_available(uuid, boolean) from public, anon;
 
 -- Owner shows or hides a copy. Hidden ('private') copies are left out of
@@ -1348,6 +1400,8 @@ grant execute on function public.call_off_loan(uuid) to authenticated;
 grant execute on function public.mark_handed_over(uuid) to authenticated;
 grant execute on function public.lend_to_friend(uuid, uuid) to authenticated;
 grant execute on function public.mark_returned(uuid) to authenticated;
+grant execute on function public.claim_returned(uuid) to authenticated;
+grant execute on function public.deny_return(uuid) to authenticated;
 grant execute on function public.set_copy_available(uuid, boolean) to authenticated;
 
 -- ============================================================
@@ -1370,6 +1424,8 @@ grant execute on function public.set_copy_available(uuid, boolean) to authentica
 --   request_declined  decline_request only (not bulk declines) -> requester
 --   lent_to_you       loans_v2 insert with no request         -> borrower
 --   hand_off_called_off loans_v2 ended 'called_off'           -> the other person
+--   return_claimed    loans_v2 return_claimed_at set          -> owner
+--   return_denied     loans_v2 return_claimed_at cleared      -> borrower
 --   friend_request    friendships insert, pending             -> addressee
 --   friend_accepted   friendships pending -> accepted         -> requester
 --   invite_joined     friendships insert, already accepted    -> requester (inviter)
@@ -1441,7 +1497,8 @@ create table public.push_outbox (
   recipient_id uuid not null references public.profiles (id) on delete cascade,
   kind text not null check (kind in (
     'borrow_request', 'request_accepted', 'request_declined', 'lent_to_you',
-    'hand_off_called_off', 'friend_request', 'friend_accepted', 'invite_joined')),
+    'hand_off_called_off', 'friend_request', 'friend_accepted', 'invite_joined',
+    'return_claimed', 'return_denied')),
   actor_id uuid references public.profiles (id) on delete set null,
   book_id uuid references public.books (id) on delete set null,
   data jsonb not null default '{}',
@@ -1473,6 +1530,8 @@ as $$
   + (select count(*) from public.loans_v2
       where (owner_id = p_user or borrower_id = p_user)
         and ended_at is null and handed_over_at is null)
+  + (select count(*) from public.loans_v2
+      where owner_id = p_user and ended_at is null and return_claimed_at is not null)
   + (select count(*) from public.friendships
       where addressee_id = p_user and status = 'pending')
   )::integer;
@@ -1582,6 +1641,32 @@ create trigger push_on_loan
   for each row execute procedure public.push_on_loan();
 
 revoke execute on function public.push_on_loan() from public, anon, authenticated;
+
+create function public.push_on_return_claim()
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if new.return_claimed_at is not null and old.return_claimed_at is null then
+    insert into public.push_outbox (recipient_id, kind, actor_id, book_id, data)
+    values (new.owner_id, 'return_claimed', new.borrower_id, new.book_id,
+            jsonb_build_object('loan_id', new.id));
+  elsif new.return_claimed_at is null and old.return_claimed_at is not null
+        and new.ended_at is null then
+    insert into public.push_outbox (recipient_id, kind, actor_id, book_id, data)
+    values (new.borrower_id, 'return_denied', new.owner_id, new.book_id,
+            jsonb_build_object('loan_id', new.id));
+  end if;
+  return null;
+end;
+$$;
+
+create trigger push_on_return_claim
+  after update of return_claimed_at on public.loans_v2
+  for each row execute procedure public.push_on_return_claim();
+
+revoke execute on function public.push_on_return_claim() from public, anon, authenticated;
 
 -- ------------------------------------------------------------
 -- Friend events. accept_invite inserts an already-accepted row with the

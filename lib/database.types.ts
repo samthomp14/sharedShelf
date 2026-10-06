@@ -115,6 +115,14 @@ export interface Database {
         Args: { p_loan_id: string };
         Returns: undefined;
       };
+      claim_returned: {
+        Args: { p_loan_id: string };
+        Returns: undefined;
+      };
+      deny_return: {
+        Args: { p_loan_id: string };
+        Returns: undefined;
+      };
       set_copy_available: {
         Args: { p_shelf_item_id: string; p_available: boolean };
         Returns: undefined;
@@ -344,6 +352,7 @@ export interface Database {
           ended_at: string | null;
           ended_reason: LoanEndedReason | null;
           ended_by: string | null;
+          return_claimed_at: string | null;
         };
         Insert: never;
         Update: never;

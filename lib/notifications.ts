@@ -28,6 +28,7 @@ export type NeedsYouItem =
   | { kind: 'borrow_request'; key: string; timestamp: string; request: PendingRequest }
   | { kind: 'hand_over'; key: string; timestamp: string; loan: ActiveLoan } // you promised it
   | { kind: 'pick_up'; key: string; timestamp: string; loan: ActiveLoan } // promised to you
+  | { kind: 'confirm_return'; key: string; timestamp: string; loan: ActiveLoan } // borrower says it's back
   | { kind: 'friend_request'; key: string; timestamp: string; id: string; requester: Person };
 
 // Lending reads throw on failure (lib/loans logs them); an empty list keeps
@@ -76,7 +77,8 @@ async function fetchNewFriends(uid: string, limit = 30): Promise<EarlierItem[]> 
 }
 
 // Everything waiting on you, grouped by kind (borrow requests first, then
-// hand-offs, then friend requests), oldest first within each.
+// hand-offs, then returns to confirm, then friend requests), oldest first
+// within each.
 export async function fetchNeedsYou(uid: string): Promise<NeedsYouItem[]> {
   const [requests, lentOut, borrowing, friendRequests] = await Promise.all([
     orEmpty(fetchIncomingRequests(uid)),
@@ -106,6 +108,15 @@ export async function fetchNeedsYou(uid: string): Promise<NeedsYouItem[]> {
       timestamp: loan.created_at,
       loan,
     })),
+    ...lentOut
+      .filter((loan) => loan.return_claimed_at)
+      .sort((a, b) => a.return_claimed_at!.localeCompare(b.return_claimed_at!))
+      .map((loan): NeedsYouItem => ({
+        kind: 'confirm_return',
+        key: `confirm-return-${loan.id}`,
+        timestamp: loan.return_claimed_at!,
+        loan,
+      })),
     ...friendRequests.flatMap((req): NeedsYouItem[] =>
       req.requester
         ? [{ kind: 'friend_request', key: `friend-${req.id}`, timestamp: req.created_at, id: req.id, requester: req.requester }]
@@ -149,7 +160,7 @@ export async function fetchNotifications(
 
 // Just the number for the bell: head-only counts, no rows.
 export async function fetchNeedsYouCount(uid: string): Promise<number> {
-  const [requests, promised, friends] = await Promise.all([
+  const [requests, promised, claimed, friends] = await Promise.all([
     supabase
       .from('loan_requests_v2')
       .select('id', { count: 'exact', head: true })
@@ -162,16 +173,23 @@ export async function fetchNeedsYouCount(uid: string): Promise<number> {
       .or(`owner_id.eq.${uid},borrower_id.eq.${uid}`)
       .is('ended_at', null)
       .is('handed_over_at', null),
+    // Returns your borrowers say they've made, waiting on you.
+    supabase
+      .from('loans_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', uid)
+      .is('ended_at', null)
+      .not('return_claimed_at', 'is', null),
     supabase
       .from('friendships')
       .select('id', { count: 'exact', head: true })
       .eq('addressee_id', uid)
       .eq('status', 'pending'),
   ]);
-  for (const res of [requests, promised, friends]) {
+  for (const res of [requests, promised, claimed, friends]) {
     if (res.error) log.warn('notifications.count_failed', { error: res.error.message });
   }
-  return (requests.count ?? 0) + (promised.count ?? 0) + (friends.count ?? 0);
+  return (requests.count ?? 0) + (promised.count ?? 0) + (claimed.count ?? 0) + (friends.count ?? 0);
 }
 
 // The bell's badge count, refetched whenever the screen under it regains
