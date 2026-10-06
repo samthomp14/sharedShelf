@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
 import { classifyBarcode } from '../../lib/isbn';
@@ -109,6 +109,7 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set when the camera fails to start (e.g. access blocked in Settings).
   const [mountError, setMountError] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   useEffect(
     () => () => {
@@ -367,10 +368,26 @@ function ScannerSession({ countRef, onClose, onManualEntry }: ScannerSessionProp
 
   return (
     <View style={styles.container}>
-      <BarcodeCamera onScanned={handleBarcodeScanned} onError={() => setMountError(true)} />
+      <BarcodeCamera
+        onScanned={handleBarcodeScanned}
+        onError={() => setMountError(true)}
+        torch={torchOn}
+      />
       <View style={styles.viewfinderWrap} pointerEvents="none">
         <View style={styles.viewfinder} />
       </View>
+      {Platform.OS !== 'web' && (
+        <Pressable
+          style={[styles.torchButton, { top: insets.top + 12 }, torchOn && styles.torchButtonOn]}
+          onPress={() => setTorchOn((on) => !on)}
+          accessibilityRole="button"
+          accessibilityLabel={torchOn ? 'Turn flash off' : 'Turn flash on'}
+        >
+          <Text style={[styles.torchText, torchOn && styles.torchTextOn]}>
+            {torchOn ? 'Flash on' : 'Flash off'}
+          </Text>
+        </Pressable>
+      )}
       <View style={[styles.overlay, { paddingBottom: 24 + insets.bottom }]}>
         {sheet ? (
           <View style={styles.sheet}>{renderSheet()}</View>
@@ -404,6 +421,25 @@ const styles = StyleSheet.create({
     height: 140,
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  torchButton: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+  },
+  torchButtonOn: {
+    backgroundColor: '#fff',
+  },
+  torchText: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: '#fff',
+  },
+  torchTextOn: {
+    color: colors.text,
   },
   overlay: {
     position: 'absolute',
