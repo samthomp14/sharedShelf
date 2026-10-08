@@ -1,0 +1,19 @@
+.gitignore
+  s_59bdc24f40c0c4::t_9ba7fe2b745fee 43-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8594c4a988852f9a163549180e6e0314971c7693",
+  "prompts": {},
+  "sessions": {
+    "s_59bdc24f40c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1d5d318-4c36-4fe5-9ba3-08143f9e5d73",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
