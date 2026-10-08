@@ -61,10 +61,6 @@ export interface Database {
         };
         Returns: { book_id: string; shelf_item_id: string; already_on_shelf: boolean }[];
       };
-      search_catalog: {
-        Args: { q: string };
-        Returns: CatalogBookRow[];
-      };
       // Works + catalog (see supabase/migrations/*_works_and_book_details.sql).
       // One row per work; Add Book search over the whole catalog.
       search_catalog_works: {
@@ -204,10 +200,12 @@ export interface Database {
           id: string;
           isbn: string | null;
           title: string;
-          authors: string[];
           cover_url: string | null;
           source: string | null;
           created_at: string;
+          // Computed field (author_names(books)), select-only: the work's
+          // author names in credit order. Select as `authors:author_names`.
+          author_names: string[];
           // One row per edition; every book gets a work (the column itself is
           // nullable, a trigger fills it on insert).
           work_id: string | null;
@@ -220,7 +218,6 @@ export interface Database {
           id?: string;
           isbn?: string | null;
           title: string;
-          authors?: string[];
           cover_url?: string | null;
           source?: string | null;
           created_at?: string;
@@ -368,18 +365,6 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database['public']['Tables']['notification_prefs']['Insert']>;
-        Relationships: [];
-      };
-      book_authors: {
-        Row: {
-          book_id: string;
-          author: string;
-        };
-        Insert: {
-          book_id: string;
-          author: string;
-        };
-        Update: Partial<Database['public']['Tables']['book_authors']['Insert']>;
         Relationships: [];
       };
       friendships: {

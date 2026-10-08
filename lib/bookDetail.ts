@@ -75,7 +75,7 @@ export interface BookDetail {
 }
 
 const BOOK_FIELDS =
-  'id, title, authors, cover_url, work_id, publisher, page_count, work:works(id, subtitle, description, first_publish_year, categories, description_checked_at, editions:books(id, cover_url), work_authors(position, author:authors(id, name)))';
+  'id, title, authors:author_names, cover_url, work_id, publisher, page_count, work:works(id, subtitle, description, first_publish_year, categories, description_checked_at, editions:books(id, cover_url), work_authors(position, author:authors(id, name)))';
 
 // Everything the book page shows, for every edition of the work: the book (with
 // its work and sibling editions) first, then copies/loans/requests in one round

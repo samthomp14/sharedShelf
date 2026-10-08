@@ -73,7 +73,7 @@ export interface MyRequest {
 }
 
 const PERSON = 'id, username, display_name, avatar_url';
-const BOOK = 'id, title, authors, cover_url';
+const BOOK = 'id, title, authors:author_names, cover_url';
 const LOAN_FIELDS = `id, shelf_item_id, created_at, handed_over_at, return_claimed_at, book:books(${BOOK}), owner:profiles!loans_v2_owner_id_fkey(${PERSON}), borrower:profiles!loans_v2_borrower_id_fkey(${PERSON})`;
 const REQUEST_FIELDS = `id, shelf_item_id, created_at, book:books(${BOOK}), requester:profiles!loan_requests_v2_requester_id_fkey(${PERSON})`;
 

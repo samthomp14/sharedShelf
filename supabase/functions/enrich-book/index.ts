@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
 
   const { data: book, error } = await admin
     .from('books')
-    .select('id, isbn, title, authors, enriched_at, work:works(id, ol_work_id, description, description_checked_at, categories)')
+    .select('id, isbn, title, authors:author_names, enriched_at, work:works(id, ol_work_id, description, description_checked_at, categories)')
     .eq('id', bookId)
     .single();
   if (error || !book) return json(404, { error: 'book not found' });
