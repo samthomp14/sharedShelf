@@ -104,17 +104,48 @@ function lastNames(authors: string[]): Set<string> {
   return new Set(authors.map((a) => a.trim().split(/\s+/).pop()!.toLowerCase()).filter(Boolean));
 }
 
-// OL subjects are noisy; keep a few short, plain ones as a fallback when
-// Google has no categories.
+// OL subjects are noisy ("Teenage girls", "Brooklyn (New York, N.Y.)"), so
+// the fallback when Google has no categories only maps them onto a fixed set
+// of genres — the same labels scripts/seed-catalog.mjs uses.
+const GENRES: [RegExp, string][] = [
+  [/science fiction|sci-fi/, 'Science fiction'],
+  [/fantasy/, 'Fantasy'],
+  [/mystery|detective/, 'Mystery'],
+  [/thriller|suspense/, 'Thriller'],
+  [/romance|love stories/, 'Romance'],
+  [/horror/, 'Horror'],
+  [/historical fiction/, 'Historical fiction'],
+  [/young adult/, 'Young adult'],
+  [/graphic novel|comic/, 'Graphic novels'],
+  [/poetry|poems/, 'Poetry'],
+  [/short stories/, 'Short stories'],
+  [/classic/, 'Classics'],
+  [/autobiography|memoir/, 'Memoir'],
+  [/biography/, 'Biography'],
+  [/philosophy/, 'Philosophy'],
+  [/psychology/, 'Psychology'],
+  [/self-help|self help/, 'Self-help'],
+  [/cooking|cookery/, 'Cooking'],
+  [/business/, 'Business'],
+  [/economics/, 'Economics'],
+  [/politic/, 'Politics'],
+  [/travel/, 'Travel'],
+  [/religion/, 'Religion'],
+  [/^history|history$/, 'History'],
+  [/^science$/, 'Science'],
+  [/^fiction$/, 'Fiction'],
+];
+
 function cleanSubjects(subjects: string[] | undefined): string[] {
   const out: string[] = [];
   for (const s of subjects ?? []) {
-    if (s.length > 24 || /[,:()]|^nyt|series|accessible|protected|lending/i.test(s)) continue;
-    const tidy = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-    if (!out.includes(tidy)) out.push(tidy);
-    if (out.length === 3) break;
+    const lower = s.toLowerCase().trim();
+    const genre = GENRES.find(([re]) => re.test(lower))?.[1];
+    if (genre && !out.includes(genre)) out.push(genre);
   }
-  return out;
+  // "Fiction" only when nothing more specific matched.
+  const specific = out.filter((g) => g !== 'Fiction');
+  return (specific.length ? specific : out).slice(0, 3);
 }
 
 function cleanCategories(categories: string[] | undefined): string[] {
