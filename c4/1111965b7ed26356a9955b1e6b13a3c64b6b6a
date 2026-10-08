@@ -1,0 +1,32 @@
+lib/bookDetail.ts
+  s_59bdc24f40c0c4::t_e97e685e7e5f9e 78
+supabase/migrations/20261008050000_author_aliases_and_reads.sql
+  s_59bdc24f40c0c4::t_91a08b82a6f316 1-243
+supabase/functions/enrich-book/index.ts
+  s_59bdc24f40c0c4::t_e97e685e7e5f9e 346
+lib/loans.ts
+  s_59bdc24f40c0c4::t_e97e685e7e5f9e 76
+lib/database.types.ts
+  s_59bdc24f40c0c4::t_b5aadf686ee5f9 206-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c41111965b7ed26356a9955b1e6b13a3c64b6b6a",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_59bdc24f40c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1d5d318-4c36-4fe5-9ba3-08143f9e5d73",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
