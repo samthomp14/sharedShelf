@@ -35,7 +35,6 @@ interface WorkFields {
   ol_work_id?: string;
   title?: string;
   subtitle?: string;
-  authors?: string[];
   description?: string;
   first_publish_year?: number;
   categories?: string[];
@@ -248,7 +247,6 @@ function fromOlDoc(doc: OlDoc): { work: WorkFields; edition: EditionFields } {
       ol_work_id: olId,
       title: doc.title,
       subtitle: doc.subtitle,
-      authors: doc.author_name,
       author_list: olAuthorList(doc),
       first_publish_year: doc.first_publish_year,
       categories: cleanSubjects(doc.subject),

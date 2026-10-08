@@ -109,7 +109,6 @@ function toSeed(doc, category) {
     ol_work_id: olWorkId,
     title,
     subtitle: doc.subtitle ?? null,
-    authors: doc.author_name.slice(0, 4),
     author_list: olAuthorList(doc),
     first_publish_year: doc.first_publish_year ?? null,
     categories: [category],
