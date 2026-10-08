@@ -1,0 +1,24 @@
+scripts/seed-catalog.mjs
+  s_59bdc24f40c0c4::t_a26116119d18cd 93-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bd289590c34d3d9a1474bbd1faaad85716d904f7",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_59bdc24f40c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1d5d318-4c36-4fe5-9ba3-08143f9e5d73",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
