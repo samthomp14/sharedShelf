@@ -6,7 +6,7 @@
 -- kept them in step (sync_book_authors, tidy_book_authors,
 -- link_new_book_authors, sync_work_author_names).
 --
--- Apply only after the app and enrich-book read authors:author_names
+-- Applied after the app and enrich-book read authors:author_names
 -- (commit c411119) are deployed: anything still selecting books.authors
 -- breaks once this runs.
 --
