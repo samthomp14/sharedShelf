@@ -1,0 +1,53 @@
+app/(app)/author/[id].tsx
+  s_59bdc24f40c0c4::t_b7cfbb4e58ef4c 2-53,59-62,76-77,79-81,84-85,92-96,98-243
+  s_59bdc24f40c0c4::t_de1ade5d794a1d 1,54-58,63-75,78,82-83,86-91,97
+app/(app)/_layout.tsx
+  s_59bdc24f40c0c4::t_7612c3b32d2f20 41
+app/(app)/book/[id].tsx
+  s_59bdc24f40c0c4::t_49a862b27eee54 215-218
+scripts/backfill-author-ids.mjs
+  s_59bdc24f40c0c4::t_634b72619a6f2b 1-113
+lib/bookDetail.ts
+  s_59bdc24f40c0c4::t_49a862b27eee54 26,78,128-130
+scripts/seed-catalog.mjs
+  s_59bdc24f40c0c4::t_5b4e81d224ae86 22,59,113
+lib/authorHref.ts
+  s_59bdc24f40c0c4::t_256ba20f7e046d 1-11
+scripts/lib/olAuthors.mjs
+  s_59bdc24f40c0c4::t_7038b04f6de0c8 1-58
+app/(app)/(tabs)/search.tsx
+  s_59bdc24f40c0c4::t_49a862b27eee54 7,38,92,235,237,239
+components/AuthorList.tsx
+  s_59bdc24f40c0c4::t_49a862b27eee54 3,7-9,18-20
+supabase/functions/enrich-book/index.ts
+  s_59bdc24f40c0c4::t_9f8c361bf145fc 44,60-61,78,189-238,252
+lib/database.types.ts
+  s_59bdc24f40c0c4::t_7612c3b32d2f20 83,88,91-97,265-305
+supabase/migrations/20261008021006_authors.sql
+  s_59bdc24f40c0c4::t_dad7031d9451e9 1-551
+supabase/migrations/20261008021131_author_ids.sql
+  s_59bdc24f40c0c4::t_7a64a4cb2251c2 1-102
+supabase/migrations/20261008022744_author_honorifics.sql
+  s_59bdc24f40c0c4::t_2f844021ca1f3d 1-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "28d1c68fb0d3eb8df4833f87a79d6a021addef24",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_59bdc24f40c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1d5d318-4c36-4fe5-9ba3-08143f9e5d73",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
