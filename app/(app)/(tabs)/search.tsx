@@ -4,6 +4,7 @@ import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View 
 import { supabase } from '../../../lib/supabase';
 import { prefetchBook } from '../../../lib/bookDetail';
 import { profileHref } from '../../../lib/profileHref';
+import { authorHref } from '../../../lib/authorHref';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/Button';
 import { colors, fonts, inputStyle, radius } from '../../../lib/theme';
@@ -34,7 +35,7 @@ export default function Search() {
   const [searched, setSearched] = useState(false);
   const [people, setPeople] = useState<PersonResult[]>([]);
   const [books, setBooks] = useState<BookResult[]>([]);
-  const [authors, setAuthors] = useState<string[]>([]);
+  const [authors, setAuthors] = useState<{ id: string; name: string }[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const searchIdRef = useRef(0);
 
@@ -88,7 +89,7 @@ export default function Search() {
 
     setPeople(peopleRes.data ?? []);
     setBooks(booksRes.data ?? []);
-    setAuthors(authorsRes.data?.map((row) => row.author) ?? []);
+    setAuthors(authorsRes.data?.map((row) => ({ id: row.author_id, name: row.author })) ?? []);
     setSearching(false);
   }
 
@@ -231,11 +232,11 @@ export default function Search() {
             <Text style={styles.sectionTitle}>Authors</Text>
             {authors.map((author) => (
               <Pressable
-                key={author}
+                key={author.id}
                 style={styles.row}
-                onPress={() => router.push(`/author/${encodeURIComponent(author)}`)}
+                onPress={() => router.push(authorHref(author))}
               >
-                <Text style={styles.name}>{author}</Text>
+                <Text style={styles.name}>{author.name}</Text>
               </Pressable>
             ))}
           </View>

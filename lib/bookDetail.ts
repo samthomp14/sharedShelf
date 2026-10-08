@@ -23,6 +23,7 @@ export interface BookInfo {
     first_publish_year: number | null;
     categories: string[];
     description_checked_at: string | null; // null = enrich-book hasn't looked yet
+    authors: { id: string; name: string }[]; // credit order
   } | null;
 }
 
@@ -74,7 +75,7 @@ export interface BookDetail {
 }
 
 const BOOK_FIELDS =
-  'id, title, authors, cover_url, work_id, publisher, page_count, work:works(id, subtitle, description, first_publish_year, categories, description_checked_at, editions:books(id, cover_url))';
+  'id, title, authors, cover_url, work_id, publisher, page_count, work:works(id, subtitle, description, first_publish_year, categories, description_checked_at, editions:books(id, cover_url), work_authors(position, author:authors(id, name)))';
 
 // Everything the book page shows, for every edition of the work: the book (with
 // its work and sibling editions) first, then copies/loans/requests in one round
@@ -124,6 +125,9 @@ async function fetchBookDetail(id: string): Promise<BookDetail> {
         first_publish_year: work.first_publish_year,
         categories: work.categories,
         description_checked_at: work.description_checked_at,
+        authors: [...(work.work_authors ?? [])]
+          .sort((a, b) => a.position - b.position)
+          .flatMap((wa) => (wa.author ? [wa.author] : [])),
       },
     };
   }

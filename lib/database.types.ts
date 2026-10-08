@@ -80,13 +80,21 @@ export interface Database {
         }[];
       };
       // Search tab and author page: only works with a copy the caller can see.
+      // p_author (by name) is the old author page's; circle_author_books replaces it.
       circle_books: {
         Args: { q?: string; p_author?: string };
         Returns: { id: string; work_id: string; title: string; authors: string[]; cover_url: string | null }[];
       };
+      // author is the display name.
       circle_authors: {
         Args: { q: string };
-        Returns: { author: string }[];
+        Returns: { author: string; author_id: string }[];
+      };
+      // Author page (see supabase/migrations/*_authors.sql). One row per work,
+      // sorted by title.
+      circle_author_books: {
+        Args: { p_author_id: string };
+        Returns: { id: string; work_id: string; title: string; authors: string[]; cover_url: string | null }[];
       };
       // Service role only (enrich-book function and seed script).
       link_book_to_work: {
@@ -253,6 +261,47 @@ export interface Database {
         Insert: never;
         Update: never;
         Relationships: [];
+      };
+      // One row per person (see supabase/migrations/*_authors.sql). Read-only
+      // for clients. books.authors still holds the display names, kept in step.
+      authors: {
+        Row: {
+          id: string;
+          name: string;
+          // Lowercased, letters and digits only; how spellings are matched.
+          name_key: string;
+          ol_author_id: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Who wrote each work, in credit order (position). Read-only for clients.
+      work_authors: {
+        Row: {
+          work_id: string;
+          author_id: string;
+          position: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: 'work_authors_work_id_fkey';
+            columns: ['work_id'];
+            isOneToOne: false;
+            referencedRelation: 'works';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'work_authors_author_id_fkey';
+            columns: ['author_id'];
+            isOneToOne: false;
+            referencedRelation: 'authors';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       client_logs: {
         Row: {

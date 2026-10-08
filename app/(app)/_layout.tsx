@@ -38,7 +38,7 @@ export default function AppLayout() {
         options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       />
       <Stack.Screen name="book/[id]" options={{ title: 'Book' }} />
-      <Stack.Screen name="author/[name]" options={{ title: 'Author' }} />
+      <Stack.Screen name="author/[id]" options={{ title: 'Author' }} />
       <Stack.Screen name="profile/[username]" options={{ title: 'Profile' }} />
       <Stack.Screen name="profile/settings" options={{ title: 'Edit Profile' }} />
       <Stack.Screen name="profile/friends" options={{ title: 'Friends' }} />

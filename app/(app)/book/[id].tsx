@@ -212,7 +212,10 @@ function BookDetail() {
           <Text style={styles.title}>{book.title}</Text>
           {book.work?.subtitle ? <Text style={styles.subtitle}>{book.work.subtitle}</Text> : null}
           {bookLoaded ? (
-            <AuthorList authors={book.authors} textStyle={styles.authors} />
+            <AuthorList
+              authors={book.work?.authors.length ? book.work.authors : book.authors.map((name) => ({ name }))}
+              textStyle={styles.authors}
+            />
           ) : (
             <Skeleton width="55%" height={15} />
           )}

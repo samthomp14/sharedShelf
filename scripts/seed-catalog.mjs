@@ -19,6 +19,7 @@
 // EXPO_PUBLIC_SUPABASE_URL is read from .env.
 
 import { readFileSync } from 'node:fs';
+import { olAuthorList } from './lib/olAuthors.mjs';
 
 // Open Library subject key -> the category label shown on the book page.
 const SUBJECTS = {
@@ -55,7 +56,7 @@ const SUBJECTS = {
 const UA = 'sharedShelf (samuelthomp14@gmail.com)';
 const DELAY_MS = 1200;
 const FIELDS = [
-  'key', 'title', 'subtitle', 'author_name', 'first_publish_year', 'cover_i', 'isbn',
+  'key', 'title', 'subtitle', 'author_name', 'author_key', 'author_alternative_name', 'first_publish_year', 'cover_i', 'isbn',
   'number_of_pages_median', 'editions', 'editions.title', 'editions.isbn',
   'editions.publisher', 'editions.language', 'editions.cover_i', 'editions.number_of_pages',
 ].join(',');
@@ -109,6 +110,7 @@ function toSeed(doc, category) {
     title,
     subtitle: doc.subtitle ?? null,
     authors: doc.author_name.slice(0, 4),
+    author_list: olAuthorList(doc),
     first_publish_year: doc.first_publish_year ?? null,
     categories: [category],
     cover_url: cover(doc.cover_i),

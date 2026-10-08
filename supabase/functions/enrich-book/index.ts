@@ -41,6 +41,7 @@ interface WorkFields {
   categories?: string[];
   cover_url?: string;
   description_checked?: boolean;
+  author_list?: { name: string; ol_author_id: string | null }[];
 }
 
 interface EditionFields {
@@ -56,6 +57,8 @@ interface OlDoc {
   title?: string;
   subtitle?: string;
   author_name?: string[];
+  author_key?: string[];
+  author_alternative_name?: string[];
   first_publish_year?: number;
   subject?: string[];
   cover_i?: number;
@@ -72,7 +75,7 @@ interface OlDoc {
 }
 
 const OL_FIELDS = [
-  'key', 'title', 'subtitle', 'author_name', 'first_publish_year', 'subject', 'cover_i',
+  'key', 'title', 'subtitle', 'author_name', 'author_key', 'author_alternative_name', 'first_publish_year', 'subject', 'cover_i',
   'number_of_pages_median', 'editions', 'editions.isbn', 'editions.publisher',
   'editions.language', 'editions.cover_i', 'editions.number_of_pages',
 ].join(',');
@@ -183,6 +186,56 @@ function cleanOlDescription(d: unknown): string | undefined {
   return text.split(/\n-{3,}/)[0].replace(/\r/g, '').trim() || undefined;
 }
 
+// Author names + OL ids in credit order, for link_book_to_work's author_list.
+// Copy of scripts/lib/olAuthors.mjs (Deno can't import it); keep in step.
+// OL's primary name is sometimes in the original script (村上春樹) or
+// mangled; for single-author works pick the best Latin-script alternate.
+const LOWERCASE_ON_PURPOSE = new Set(['bell hooks', 'e.e. cummings', 'e. e. cummings']);
+const nameKey = (n: string) => n.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+function isGoodName(n: string | undefined): n is string {
+  if (!n || /[;()\d,]/.test(n)) return false;
+  if (!/^[\p{Script=Latin}\s.'’-]+$/u.test(n)) return false;
+  if (LOWERCASE_ON_PURPOSE.has(n.toLowerCase())) return true;
+  return n !== n.toUpperCase() && n !== n.toLowerCase();
+}
+
+const capitalizedName = (n: string) =>
+  n.split(/\s+/).every((w) => /^\p{Lu}\p{Ll}/u.test(w) || /^\p{Lu}\.?$/u.test(w));
+
+function pickAuthorName(primary: string, alternates: string[] | undefined): string {
+  if (isGoodName(primary)) return primary;
+  const good = (alternates ?? []).filter((a) => isGoodName(a) && a.trim().split(/\s+/).length >= 2);
+  if (good.length === 0) return primary;
+  // "MURAKAMI Haruki" marks the surname; prefer spellings that put it last.
+  const surnames = new Set<string>();
+  for (const a of alternates ?? []) {
+    const m = a.match(/^(\p{Lu}{2,}) \p{Lu}\p{Ll}+$/u);
+    if (m) surnames.add(m[1].toLowerCase());
+  }
+  const uses = new Map<string, number>();
+  for (const a of good) uses.set(nameKey(a), (uses.get(nameKey(a)) ?? 0) + 1);
+  const score = (a: string) => [
+    surnames.has(a.trim().split(/\s+/).pop()!.toLowerCase()) ? 1 : 0,
+    uses.get(nameKey(a))!,
+    capitalizedName(a) ? 1 : 0,
+  ];
+  return good
+    .map((a, i) => ({ a, s: score(a), i }))
+    .sort((x, y) => y.s[0] - x.s[0] || y.s[1] - x.s[1] || y.s[2] - x.s[2] || x.i - y.i)[0].a;
+}
+
+function olAuthorList(doc: OlDoc): { name: string; ol_author_id: string | null }[] | undefined {
+  const names = doc.author_name ?? [];
+  if (names.length === 0) return undefined;
+  const keys = doc.author_key ?? [];
+  const single = names.length === 1;
+  return names.slice(0, 4).map((n, i) => ({
+    name: single ? pickAuthorName(n, doc.author_alternative_name) : n,
+    ol_author_id: /^OL\d+A$/.test(keys[i] ?? '') ? keys[i] : null,
+  }));
+}
+
 function firstIsbn13(isbns: string[] | undefined): string | undefined {
   return isbns?.find((i) => /^97[89]\d{10}$/.test(i));
 }
@@ -196,6 +249,7 @@ function fromOlDoc(doc: OlDoc): { work: WorkFields; edition: EditionFields } {
       title: doc.title,
       subtitle: doc.subtitle,
       authors: doc.author_name,
+      author_list: olAuthorList(doc),
       first_publish_year: doc.first_publish_year,
       categories: cleanSubjects(doc.subject),
       cover_url: olCover(doc.cover_i),
