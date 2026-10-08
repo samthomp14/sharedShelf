@@ -1,0 +1,25 @@
+supabase/migrations/20261008060000_drop_author_name_lists.sql
+  s_59bdc24f40c0c4::t_995b09e0a15bb7 218,225,282-283
+  s_59bdc24f40c0c4::t_8927b8dfd7ac9a 1-217,219-224,226-281,284-358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d5cd85806d85a3c2f7f777d39499eac90221f3f3",
+  "prompts": {},
+  "humans": {
+    "h_4e1d4ad18f97c2": {
+      "author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  },
+  "sessions": {
+    "s_59bdc24f40c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1d5d318-4c36-4fe5-9ba3-08143f9e5d73",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Samuel Thompson <sam@atlog.ai>"
+    }
+  }
+}
