@@ -90,7 +90,10 @@ function pickIsbn(list) {
 }
 
 function toSeed(doc, category) {
-  const ed = doc.editions?.docs?.[0];
+  // A best edition tagged with another language (El Principito, a German
+  // Douglas Adams) isn't one; use the work's English-publisher ISBN instead.
+  const best = doc.editions?.docs?.[0];
+  const ed = best?.language?.length && !best.language.includes('eng') ? undefined : best;
   const olWorkId = doc.key?.match(/OL\d+W/)?.[0];
   const edIsbn = pickIsbn(ed?.isbn);
   // The best edition sometimes has no ISBN; fall back to one of the work's,
