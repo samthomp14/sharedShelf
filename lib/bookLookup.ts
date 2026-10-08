@@ -8,6 +8,8 @@ import { log } from './log';
 
 export interface CatalogBook {
   id: string;
+  // The work this edition belongs to. Null from lookup_isbn, which doesn't return it.
+  workId?: string | null;
   isbn: string | null;
   title: string;
   authors: string[];
@@ -133,11 +135,13 @@ interface CatalogRow {
   authors: string[] | null;
   cover_url: string | null;
   shelf_item_id: string | null;
+  work_id?: string | null;
 }
 
 function toCatalogBook(row: CatalogRow): CatalogBook {
   return {
     id: row.id,
+    workId: row.work_id ?? null,
     isbn: row.isbn,
     title: row.title,
     authors: row.authors ?? [],
@@ -147,8 +151,10 @@ function toCatalogBook(row: CatalogRow): CatalogBook {
   };
 }
 
+// One result per work: the caller's own edition if they have one, else the
+// most-shelved edition.
 export async function searchCatalog(q: string): Promise<CatalogBook[]> {
-  const { data, error } = await supabase.rpc('search_catalog', { q: q.trim() });
+  const { data, error } = await supabase.rpc('search_catalog_works', { q: q.trim() });
   if (error) {
     log.error('book_lookup.search_catalog_failed', { q, error: error.message });
     throw new Error(error.message);

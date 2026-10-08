@@ -78,8 +78,9 @@ export default function Search() {
         .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
         .neq('id', uid ?? '')
         .limit(15),
-      supabase.from('books').select('id, title, authors, cover_url').ilike('title', `%${q}%`).limit(15),
-      supabase.from('book_authors').select('author').ilike('author', `%${q}%`).limit(50),
+      // Only books/authors with a copy you can see, not the whole catalog.
+      supabase.rpc('circle_books', { q }).limit(15),
+      supabase.rpc('circle_authors', { q }),
     ]);
 
     // A newer keystroke already started another search — drop this stale response.
@@ -87,7 +88,7 @@ export default function Search() {
 
     setPeople(peopleRes.data ?? []);
     setBooks(booksRes.data ?? []);
-    setAuthors(Array.from(new Set(authorsRes.data?.map((row) => row.author) ?? [])).slice(0, 15));
+    setAuthors(authorsRes.data?.map((row) => row.author) ?? []);
     setSearching(false);
   }
 

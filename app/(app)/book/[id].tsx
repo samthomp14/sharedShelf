@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   loadBookDetail,
+  requestBookDetails,
   type BookCopy,
   type BookInfo,
   type BookLoan,
@@ -22,12 +23,14 @@ import {
 } from '../../../components/book/YourCopyCard';
 import { FriendCopies, FriendCopiesSkeleton } from '../../../components/book/FriendCopies';
 import { FriendPicker } from '../../../components/book/FriendPicker';
+import { BookAbout, BookAboutSkeleton, GenreChips, bookMetaLine } from '../../../components/book/BookAbout';
 import { useRefetchOnVisible, useRefreshing } from '../../../lib/refresh';
 import { colors, fonts, organicCorners } from '../../../lib/theme';
 
-// One page for everyone: the book up top, then a card for each copy you're
-// involved with (yours, one you're borrowing or picking up, or one you've
-// asked for), then the friends' copies you can see.
+// One page for everyone: the book up top (with its description, when we
+// have one), then a card for each copy you're involved with (yours, one
+// you're borrowing or picking up, or one you've asked for), then the
+// friends' copies you can see.
 export default function BookDetailScreen() {
   return (
     <ToastProvider>
@@ -49,7 +52,16 @@ function BookDetail() {
   // immediately instead of a blank screen while the full fetch is in flight.
   const [book, setBook] = useState<BookInfo | null>(() =>
     id && placeholderTitle
-      ? { id, title: placeholderTitle, authors: [], cover_url: placeholderCoverUrl || null }
+      ? {
+          id,
+          title: placeholderTitle,
+          authors: [],
+          cover_url: placeholderCoverUrl || null,
+          work_id: null,
+          publisher: null,
+          page_count: null,
+          work: null,
+        }
       : null
   );
   const [copies, setCopies] = useState<BookCopy[]>([]);
@@ -62,6 +74,11 @@ function BookDetail() {
   const [busy, setBusy] = useState<string | null>(null);
   // The copy "Lend to a friend" was tapped on, while the picker is open.
   const [lendingCopyId, setLendingCopyId] = useState<string | null>(null);
+  // The description/genres are fetched from the catalog lazily, the first
+  // time anyone opens the book. Which book we've asked for (once per mount),
+  // and whether that ask is still out.
+  const detailsRequestedFor = useRef<string | null>(null);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
 
   const load = useCallback(async ({ fresh = false }: { fresh?: boolean } = {}) => {
     if (!id) return;
@@ -90,6 +107,19 @@ function BookDetail() {
       load();
     }, [load])
   );
+
+  // Never checked for a description yet: ask the server to look it up, and
+  // reload if it found anything. A failure just means no About section.
+  const needsDetails = bookLoaded && !!book?.work && !book.work.description_checked_at;
+  useEffect(() => {
+    if (!needsDetails || !book || detailsRequestedFor.current === book.id) return;
+    detailsRequestedFor.current = book.id;
+    setFetchingDetails(true);
+    requestBookDetails(book.id)
+      .then((found) => (found ? load({ fresh: true }) : undefined))
+      .catch(() => {})
+      .finally(() => setFetchingDetails(false));
+  }, [needsDetails, book, load]);
   // Explicit refreshes always go to the network, never a prefetched result.
   const refetch = useCallback(() => load({ fresh: true }), [load]);
   const { refreshing, onRefresh } = useRefreshing(refetch);
@@ -126,6 +156,14 @@ function BookDetail() {
   const myRequests = requests.filter((r) => r.requester_id === uid);
   const loanFor = (copyId: string) => loans.find((l) => l.shelf_item_id === copyId) ?? null;
   const ownerOf = (copyId: string | null) => copies.find((c) => c.id === copyId)?.owner ?? null;
+  // Skeleton the About spot from the first render that knows it'll ask,
+  // not just once the request is out.
+  const aboutPending =
+    fetchingDetails || (needsDetails && detailsRequestedFor.current !== book?.id);
+  const description = book?.work?.description?.trim() || null;
+  const metaLine = book
+    ? bookMetaLine(book.work?.first_publish_year, book.page_count, book.publisher)
+    : null;
   // Your oldest copy, for the "On your shelf since" line.
   const shelvedAt = myCopies.map((c) => c.created_at).sort()[0];
 
@@ -172,14 +210,20 @@ function BookDetail() {
         )}
         <View style={styles.headerText}>
           <Text style={styles.title}>{book.title}</Text>
+          {book.work?.subtitle ? <Text style={styles.subtitle}>{book.work.subtitle}</Text> : null}
           {bookLoaded ? (
             <AuthorList authors={book.authors} textStyle={styles.authors} />
           ) : (
             <Skeleton width="55%" height={15} />
           )}
+          {metaLine && <Text style={styles.meta}>{metaLine}</Text>}
+          {book.work && <GenreChips categories={book.work.categories} />}
           {shelvedAt && <Text style={styles.shelvedAt}>On your shelf since {shelfMonth(shelvedAt)}</Text>}
         </View>
       </View>
+
+      {/* Clamped to four lines, so the lending cards stay near the top. */}
+      {description ? <BookAbout description={description} /> : aboutPending ? <BookAboutSkeleton /> : null}
 
       {myCopies.map((copy) => (
         <OwnedCopyCard
@@ -271,8 +315,20 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     color: colors.text,
   },
+  subtitle: {
+    fontFamily: fonts.display,
+    fontSize: 14,
+    lineHeight: 19,
+    color: colors.textMuted,
+    marginTop: -2,
+  },
   authors: {
     fontSize: 15,
+    color: colors.textMuted,
+  },
+  meta: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
     color: colors.textMuted,
   },
   shelvedAt: {

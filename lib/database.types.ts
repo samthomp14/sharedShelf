@@ -65,6 +65,38 @@ export interface Database {
         Args: { q: string };
         Returns: CatalogBookRow[];
       };
+      // Works + catalog (see supabase/migrations/*_works_and_book_details.sql).
+      // One row per work; Add Book search over the whole catalog.
+      search_catalog_works: {
+        Args: { q: string };
+        Returns: {
+          id: string;
+          work_id: string;
+          isbn: string | null;
+          title: string;
+          authors: string[];
+          cover_url: string | null;
+          shelf_item_id: string | null;
+        }[];
+      };
+      // Search tab and author page: only works with a copy the caller can see.
+      circle_books: {
+        Args: { q?: string; p_author?: string };
+        Returns: { id: string; work_id: string; title: string; authors: string[]; cover_url: string | null }[];
+      };
+      circle_authors: {
+        Args: { q: string };
+        Returns: { author: string }[];
+      };
+      // Service role only (enrich-book function and seed script).
+      link_book_to_work: {
+        Args: { p_book_id: string; p_work: Json; p_edition?: Json };
+        Returns: string;
+      };
+      seed_catalog: {
+        Args: { p_works: Json };
+        Returns: number;
+      };
       lookup_isbn: {
         Args: { p_isbn: string };
         Returns: CatalogBookRow[];
@@ -168,6 +200,13 @@ export interface Database {
           cover_url: string | null;
           source: string | null;
           created_at: string;
+          // One row per edition; every book gets a work (the column itself is
+          // nullable, a trigger fills it on insert).
+          work_id: string | null;
+          publisher: string | null;
+          page_count: number | null;
+          language: string | null;
+          enriched_at: string | null;
         };
         Insert: {
           id?: string;
@@ -177,8 +216,42 @@ export interface Database {
           cover_url?: string | null;
           source?: string | null;
           created_at?: string;
+          work_id?: string | null;
+          publisher?: string | null;
+          page_count?: number | null;
+          language?: string | null;
+          enriched_at?: string | null;
         };
         Update: Partial<Database['public']['Tables']['books']['Insert']>;
+        Relationships: [
+          {
+            foreignKeyName: 'books_work_id_fkey';
+            columns: ['work_id'];
+            isOneToOne: false;
+            referencedRelation: 'works';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      // All editions of a title share a work. Read-only for clients; written
+      // by triggers and the enrich-book function.
+      works: {
+        Row: {
+          id: string;
+          ol_work_id: string | null;
+          title: string;
+          subtitle: string | null;
+          authors: string[];
+          description: string | null;
+          first_publish_year: number | null;
+          categories: string[];
+          cover_url: string | null;
+          // Set once a description was looked for, found or not.
+          description_checked_at: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       client_logs: {

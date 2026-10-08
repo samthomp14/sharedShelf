@@ -1,0 +1,320 @@
+// enrich-book: fills in one book's details (work link, description,
+// categories, publisher, page count) from Open Library and Google Books, then
+// writes them through link_book_to_work, which only fills empty fields.
+//
+// Called two ways, both with {"book_id": "<id>"}:
+//   * by the dispatch_book_enrich trigger (pg_net) right after a book is
+//     added without details, with the x-catalog-secret header;
+//   * by the app when someone opens a book whose work has no description
+//     checked yet (seeded books), with the signed-in user's JWT.
+// Either way it costs at most a few requests per book, once: a book that's
+// enriched with its description checked is a no-op.
+//
+// The secret caller may also pass "adopt_edition": true, which lets a book
+// with no ISBN take the matched edition's ISBN (one-off demo-data cleanup).
+//
+// Secrets (Edge Functions -> Secrets): CATALOG_WEBHOOK_SECRET (same value as
+// the catalog_webhook_secret Vault secret), GOOGLE_BOOKS_API_KEY (optional).
+// SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided.
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+// Open Library asks apps to identify themselves; that also raises the limit
+// from 1 to 3 requests a second.
+const OL_HEADERS = { 'User-Agent': 'sharedShelf (samuelthomp14@gmail.com)' };
+const GOOGLE_KEY = Deno.env.get('GOOGLE_BOOKS_API_KEY');
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
+interface WorkFields {
+  ol_work_id?: string;
+  title?: string;
+  subtitle?: string;
+  authors?: string[];
+  description?: string;
+  first_publish_year?: number;
+  categories?: string[];
+  cover_url?: string;
+  description_checked?: boolean;
+}
+
+interface EditionFields {
+  isbn?: string;
+  publisher?: string;
+  page_count?: number;
+  language?: string;
+  cover_url?: string;
+}
+
+interface OlDoc {
+  key?: string;
+  title?: string;
+  subtitle?: string;
+  author_name?: string[];
+  first_publish_year?: number;
+  subject?: string[];
+  cover_i?: number;
+  number_of_pages_median?: number;
+  editions?: {
+    docs?: {
+      isbn?: string[];
+      publisher?: string[];
+      language?: string[];
+      cover_i?: number;
+      number_of_pages?: number;
+    }[];
+  };
+}
+
+const OL_FIELDS = [
+  'key', 'title', 'subtitle', 'author_name', 'first_publish_year', 'subject', 'cover_i',
+  'number_of_pages_median', 'editions', 'editions.isbn', 'editions.publisher',
+  'editions.language', 'editions.cover_i', 'editions.number_of_pages',
+].join(',');
+
+async function getJson<T>(url: string, headers: Record<string, string> = {}): Promise<T | null> {
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    console.warn(`${new URL(url).host} responded ${res.status}`);
+    return null;
+  }
+  return (await res.json()) as T;
+}
+
+const olCover = (id?: number) => (id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : undefined);
+
+// Comparable form of a title: lowercase, no subtitle, no punctuation or
+// leading article.
+function titleKey(s: string): string {
+  return s
+    .toLowerCase()
+    .split(':')[0]
+    .replace(/[^\p{L}\p{N} ]/gu, '')
+    .replace(/^(the|a|an) /, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lastNames(authors: string[]): Set<string> {
+  return new Set(authors.map((a) => a.trim().split(/\s+/).pop()!.toLowerCase()).filter(Boolean));
+}
+
+// OL subjects are noisy; keep a few short, plain ones as a fallback when
+// Google has no categories.
+function cleanSubjects(subjects: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const s of subjects ?? []) {
+    if (s.length > 24 || /[,:()]|^nyt|series|accessible|protected|lending/i.test(s)) continue;
+    const tidy = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    if (!out.includes(tidy)) out.push(tidy);
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
+function cleanCategories(categories: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const c of categories ?? []) {
+    for (const part of c.split('/').map((p) => p.trim())) {
+      if (!part || /^general$/i.test(part) || out.includes(part)) continue;
+      out.push(part);
+    }
+  }
+  return out.slice(0, 3);
+}
+
+// Google descriptions come with HTML (<p>, <br>, <i>, entities).
+function stripHtml(s: string): string {
+  return s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// OL work descriptions are a string or {value}, often with a trailing
+// "----------" block of links/sources.
+function cleanOlDescription(d: unknown): string | undefined {
+  const text = typeof d === 'string' ? d : (d as { value?: string } | null)?.value;
+  if (!text) return undefined;
+  return text.split(/\n-{3,}/)[0].replace(/\r/g, '').trim() || undefined;
+}
+
+function firstIsbn13(isbns: string[] | undefined): string | undefined {
+  return isbns?.find((i) => /^97[89]\d{10}$/.test(i));
+}
+
+function fromOlDoc(doc: OlDoc): { work: WorkFields; edition: EditionFields } {
+  const ed = doc.editions?.docs?.[0];
+  const olId = doc.key?.match(/OL\d+W/)?.[0];
+  return {
+    work: {
+      ol_work_id: olId,
+      title: doc.title,
+      subtitle: doc.subtitle,
+      authors: doc.author_name,
+      first_publish_year: doc.first_publish_year,
+      categories: cleanSubjects(doc.subject),
+      cover_url: olCover(doc.cover_i),
+    },
+    edition: {
+      isbn: firstIsbn13(ed?.isbn),
+      publisher: ed?.publisher?.[0],
+      page_count: ed?.number_of_pages ?? doc.number_of_pages_median,
+      language: ed?.language?.[0],
+      cover_url: olCover(ed?.cover_i),
+    },
+  };
+}
+
+async function olByIsbn(isbn: string) {
+  const res = await getJson<{ docs?: OlDoc[] }>(
+    `https://openlibrary.org/search.json?isbn=${isbn}&fields=${OL_FIELDS}&limit=1`,
+    OL_HEADERS
+  );
+  const doc = res?.docs?.[0];
+  return doc ? fromOlDoc(doc) : null;
+}
+
+// For books with no ISBN: accept the top hit only if the title matches and
+// an author's last name overlaps.
+async function olByTitle(title: string, authors: string[]) {
+  const params = new URLSearchParams({ title, fields: OL_FIELDS, limit: '5', lang: 'en' });
+  if (authors[0]) params.set('author', authors[0]);
+  const res = await getJson<{ docs?: OlDoc[] }>(`https://openlibrary.org/search.json?${params}`, OL_HEADERS);
+  const want = titleKey(title);
+  const names = lastNames(authors);
+  const doc = (res?.docs ?? []).find(
+    (d) =>
+      d.title &&
+      titleKey(d.title) === want &&
+      (names.size === 0 || [...lastNames(d.author_name ?? [])].some((n) => names.has(n)))
+  );
+  return doc ? fromOlDoc(doc) : null;
+}
+
+async function olWorkDescription(olWorkId: string) {
+  const res = await getJson<{ description?: unknown }>(
+    `https://openlibrary.org/works/${olWorkId}.json`,
+    OL_HEADERS
+  );
+  return cleanOlDescription(res?.description);
+}
+
+interface GoogleInfo {
+  subtitle?: string;
+  description?: string;
+  categories?: string[];
+  publisher?: string;
+  pageCount?: number;
+  language?: string;
+}
+
+async function google(isbn: string): Promise<GoogleInfo | null> {
+  if (!GOOGLE_KEY) return null;
+  const res = await getJson<{ items?: { volumeInfo?: GoogleInfo }[] }>(
+    `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${GOOGLE_KEY}`
+  );
+  return res?.items?.[0]?.volumeInfo ?? null;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
+  const url = Deno.env.get('SUPABASE_URL')!;
+  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  // Trigger (shared secret) or a signed-in user.
+  const secret = Deno.env.get('CATALOG_WEBHOOK_SECRET');
+  const trusted = !!secret && req.headers.get('x-catalog-secret') === secret;
+  if (!trusted) {
+    const token = req.headers.get('Authorization')?.replace(/^Bearer /, '');
+    const { data } = token ? await admin.auth.getUser(token) : { data: { user: null } };
+    if (!data.user) return json(401, { error: 'unauthorized' });
+  }
+
+  let bookId: string | undefined;
+  let adoptEdition = false;
+  try {
+    const body = await req.json();
+    bookId = body.book_id;
+    adoptEdition = trusted && body.adopt_edition === true;
+  } catch {
+    // fall through
+  }
+  if (!bookId) return json(400, { error: 'book_id required' });
+
+  const { data: book, error } = await admin
+    .from('books')
+    .select('id, isbn, title, authors, enriched_at, work:works(id, ol_work_id, description, description_checked_at, categories)')
+    .eq('id', bookId)
+    .single();
+  if (error || !book) return json(404, { error: 'book not found' });
+
+  const work = book.work as unknown as {
+    ol_work_id: string | null;
+    description: string | null;
+    description_checked_at: string | null;
+    categories: string[];
+  } | null;
+  if (book.enriched_at && work?.description_checked_at) return json(200, { skipped: true });
+
+  try {
+    const workFields: WorkFields = { description_checked: true };
+    const edition: EditionFields = {};
+
+    // Open Library: the work link and edition details, unless we have them.
+    if (!book.enriched_at || !work?.ol_work_id) {
+      const ol = book.isbn ? await olByIsbn(book.isbn) : await olByTitle(book.title, book.authors ?? []);
+      if (ol) {
+        Object.assign(workFields, ol.work);
+        Object.assign(edition, ol.edition);
+        if (book.isbn || !adoptEdition) delete edition.isbn;
+      }
+    } else {
+      workFields.ol_work_id = work.ol_work_id;
+    }
+
+    // Google: the better description and categories, by ISBN.
+    const isbn = book.isbn ?? edition.isbn;
+    const g = isbn ? await google(isbn) : null;
+    if (g) {
+      if (g.description) workFields.description = stripHtml(g.description);
+      const cats = cleanCategories(g.categories);
+      if (cats.length) workFields.categories = cats;
+      workFields.subtitle ??= g.subtitle;
+      edition.publisher ??= g.publisher;
+      edition.page_count ??= g.pageCount;
+      edition.language ??= g.language;
+    }
+
+    // Open Library work description as the fallback.
+    if (!workFields.description && !work?.description && workFields.ol_work_id) {
+      workFields.description = await olWorkDescription(workFields.ol_work_id);
+    }
+
+    const { error: linkError } = await admin.rpc('link_book_to_work', {
+      p_book_id: book.id,
+      p_work: workFields,
+      p_edition: edition,
+    });
+    if (linkError) throw new Error(linkError.message);
+
+    return json(200, { ok: true, ol_work_id: workFields.ol_work_id ?? null });
+  } catch (e) {
+    console.error('enrich-book failed', bookId, e);
+    return json(500, { error: e instanceof Error ? e.message : String(e) });
+  }
+});

@@ -26,11 +26,8 @@ export default function AuthorBooks() {
   const load = useCallback(async () => {
     if (!authorName) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('books')
-      .select('id, title, cover_url')
-      .contains('authors', [authorName])
-      .order('title', { ascending: true });
+    // One row per work, only books with a copy you can see (sorted by title).
+    const { data, error } = await supabase.rpc('circle_books', { p_author: authorName });
 
     if (!error && data) {
       setBooks(data);
